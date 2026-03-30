@@ -21,7 +21,7 @@ cortextOS runs Claude Code as a persistent agent that never sleeps. You control 
 |-------------|-------|
 | Node.js 20+ | [nodejs.org](https://nodejs.org) — checked by installer |
 | Claude Code | `npm install -g @anthropic-ai/claude-code` — checked by installer |
-| ANTHROPIC_API_KEY | Must be set in your shell profile before starting agents |
+| Claude Code login | Run `claude login` once to authenticate — agents use your stored session |
 | Telegram bot token | Created during `/onboarding` — @BotFather walks you through it |
 
 **Platform support:** Mac, Linux, and Windows natively supported.
@@ -45,13 +45,6 @@ node -e "$(irm https://get.cortextos.dev/install.mjs)"
 ```
 
 This clones the repo, installs dependencies, builds, and links the `cortextos` CLI. PM2 is installed automatically if missing. Works natively on Mac, Linux, and Windows — no WSL2 required. At the end it prints exactly where the project was cloned.
-
-**Before running, set your API key:**
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-# Add to ~/.zshrc or ~/.bashrc to persist
-```
 
 ### 2. Run the guided onboarding
 
@@ -79,13 +72,6 @@ The `/onboarding` slash command walks you through the complete setup end to end:
 8. **Dashboard setup** — installs dependencies, writes `.env.local`, builds and starts the dashboard
 
 After that, the Orchestrator comes online in Telegram and continues onboarding there — gathering its identity, persona, goals, and cron schedule through your conversation. It then creates your Analyst agent, which does its own Telegram onboarding. By the end, the full system is configured.
-
-**Before running `/onboarding`, set your API key:**
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-# Add to ~/.zshrc or ~/.bashrc to persist
-```
 
 ---
 
@@ -276,7 +262,6 @@ Intervals: `30s`, `5m`, `1h`, `4h`, `1d`. Crons are registered as `/loop` comman
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ANTHROPIC_API_KEY` | Claude API key | required |
 | `CTX_INSTANCE_ID` | State directory name | `default` |
 | `CTX_ROOT` | State directory path | `~/.cortextos/{instance}` |
 | `CTX_FRAMEWORK_ROOT` | Repo root path | auto-detected |

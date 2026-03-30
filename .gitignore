@@ -1,5 +1,7 @@
 node_modules/
 .claude/
+!.claude/commands/
+!.claude/commands/**
 !.claude/orchestration-cortextos-node/
 # Include template .claude dirs (needed for agent settings.json)
 !templates/**/.claude/

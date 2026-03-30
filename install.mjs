@@ -85,14 +85,12 @@ if (commandExists('claude')) {
   warn('  npm install -g @anthropic-ai/claude-code');
 }
 
-// ANTHROPIC_API_KEY
-if (process.env.ANTHROPIC_API_KEY) {
-  ok('ANTHROPIC_API_KEY is set');
-} else {
-  warn('ANTHROPIC_API_KEY is not set. Add it to your shell profile before starting agents:');
-  warn(IS_WINDOWS
-    ? '  $env:ANTHROPIC_API_KEY = "sk-ant-..."  # PowerShell'
-    : '  export ANTHROPIC_API_KEY=sk-ant-...');
+// Claude Code auth
+try {
+  run('claude --version');
+  ok('Claude Code authenticated (using stored login)');
+} catch {
+  warn('Run "claude login" to authenticate Claude Code before starting agents.');
 }
 
 console.log('');
@@ -178,10 +176,3 @@ console.log('');
 console.log('  That\'s it. The /onboarding command walks you through everything:');
 console.log('  org setup, agent creation, Telegram bots, dashboard, and more.');
 console.log('');
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.log(`${Y}  Remember to set your API key first:${R}`);
-  console.log(IS_WINDOWS
-    ? '  $env:ANTHROPIC_API_KEY = "sk-ant-..."'
-    : '  export ANTHROPIC_API_KEY=sk-ant-...');
-  console.log('');
-}
