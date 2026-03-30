@@ -299,46 +299,74 @@ After monitoring priorities are collected:
     {"name": "theta-wave", "interval": "24h", "prompt": "Read skills/theta-wave/SKILL.md. Initiate the theta wave cycle. First action: message the orchestrator that theta wave is starting and share your initial system scan."}
     ```
 
-## Part 8: Specialist Agent Recommendations and Chain Handoff
+## Part 8: Dashboard Walkthrough
 
 After theta wave is configured:
 
-28. **Review what you've learned and recommend specialists:**
+28. **Offer a dashboard walkthrough:**
 
-   Based on the goals and monitoring setup, identify gaps where a specialist agent would help:
+   > "One more thing before we wrap up — would you like a quick tour of the web dashboard? It's live right now at [dashboard URL]. I can walk you through what each page shows and how to use it."
 
-   > "Based on what I'll be monitoring and your goals, here are specialist agents that would strengthen the team:
-   > [list 1-3 specific recommendations based on their org context]
+   If yes: walk through each section:
+   - **Agents page** — status of every agent, last heartbeat, current task
+   - **Tasks page** — full task queue across all agents, create/assign tasks manually
+   - **Approvals page** — pending approvals waiting for your decision, approval history
+   - **Analytics page** — cost tracking, task throughput, event timeline
+   - **Experiments page** — active autoresearch cycles, hypothesis history, results
+
+   > "Anything on the dashboard you want me to explain further?"
+
+## Part 9: Specialist Agent Recommendations
+
+After dashboard walkthrough (or if skipped):
+
+29. **Review what you've learned and recommend specialists:**
+
+   Based on the org goals and monitoring setup, identify gaps where a specialist agent would help. Be specific and honest about tradeoffs:
+
+   > "Here's my take on specialist agents for your team:
+   >
+   > A word of caution first — each additional agent consumes tokens on every heartbeat and cron cycle. Two or three highly focused agents outperform five unfocused ones every time. Start lean. You can always add more.
+   >
+   > That said, based on your goals, here's where a specialist would genuinely help:
+   > [list 1-3 specific, justified recommendations based on their actual context]
    > For example: if there's code to write → developer agent; lots of web research → research agent; content pipeline → content agent.
    >
-   > The Orchestrator can create these now. Should I loop it in?"
+   > Want to create any of these now? The Orchestrator will walk you through it — takes about 5 minutes per agent."
 
-   If yes: find the orchestrator from heartbeats and send it a message:
+   If yes: find the orchestrator and signal it to run specialist creation:
    ```bash
-   # Find the orchestrator agent name from context.json
    ORCH_NAME=$(cat "${CTX_FRAMEWORK_ROOT}/orgs/${CTX_ORG}/context.json" 2>/dev/null | jq -r '.orchestrator // empty')
-   # Fallback: find first agent with role=orchestrator from heartbeats
    if [ -z "$ORCH_NAME" ]; then
      ORCH_NAME=$(ls "${CTX_ROOT}/state/" 2>/dev/null | head -1)
    fi
    if [ -n "$ORCH_NAME" ]; then
-     cortextos bus send-message "${ORCH_NAME}" normal "Analyst onboarding complete. Recommended specialists: [list]. User wants to proceed with creation. Please run Part 8 specialist creation flow."
+     cortextos bus send-message "${ORCH_NAME}" normal "Analyst onboarding complete. User wants to create specialist agents: [list]. Please run specialist creation flow (Part 8 of your ONBOARDING.md) now."
    fi
    ```
 
-   If specialists were already created by Orchestrator before analyst onboarding: confirm with user that the team is complete.
+   Wait for orchestrator to confirm each specialist is created and onboarding complete before proceeding.
 
-29. **Mark analyst onboarding complete:**
+   If no specialists wanted: proceed to step 30.
+
+30. **Mark analyst onboarding complete:**
 
    ```bash
    touch "${CTX_ROOT}/state/${CTX_AGENT_NAME}/.onboarded"
    cortextos bus log-event action onboarding_complete info '{"agent":"'$CTX_AGENT_NAME'","role":"analyst"}'
    ```
 
-   Notify user:
-   > "I'm fully set up. I'm monitoring [N] agents, running health checks every 2 hours, and [reporting style] to [report target]. Theta wave is [enabled/disabled].
+   Deliver the system-ready message:
+   > "Your cortextOS system is all set up and ready to work.
    >
-   > Your Orchestrator will now handle creating any specialist agents. Once they're online, your full team is operational."
+   > Here's what's running:
+   > - [Orchestrator name] — coordinating your team, handling briefings and approvals
+   > - [Analyst name] (me) — monitoring system health, running theta wave improvement cycles
+   > - [any specialists] — [their roles]
+   >
+   > I'll check in with you [reporting style]. Theta wave runs [interval]. If anything needs your attention, you'll hear from me or the Orchestrator on Telegram.
+   >
+   > You're good to go."
 
 ## Notes
 - Be conversational, not robotic. Match the personality the user gives you.
