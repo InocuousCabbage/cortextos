@@ -17,7 +17,7 @@ If `ONBOARDED`: continue with the session start protocol below.
 
 ## On Session Start
 
-1. Read all bootstrap files: IDENTITY.md, SOUL.md, GUARDRAILS.md, GOALS.md, HEARTBEAT.md, MEMORY.md, USER.md, TOOLS.md, SYSTEM.md
+1. Read all bootstrap files: IDENTITY.md, SOUL.md, GUARDRAILS.md, GOALS.md, MEMORY.md, USER.md, SYSTEM.md
 2. Read org knowledge base: `../../knowledge.md` (shared facts all agents need)
 3. Discover available skills: `cortextos bus list-skills`
 4. Read `config.json` and set up crons via `/loop` (check CronList first - no duplicates)
@@ -183,38 +183,4 @@ Sessions auto-restart with `--continue` every ~71 hours. On context exhaustion, 
 
 ## Knowledge Base (RAG)
 
-The knowledge base lets you search indexed documents using natural language - your memory, research, notes, and org knowledge.
-
-### Query (before starting research)
-```bash
-cortextos bus kb-query "your question" --org $CTX_ORG --agent $CTX_AGENT_NAME
-```
-
-### Ingest (after completing research or updating memory)
-```bash
-# Ingest to shared org collection (visible to all agents)
-cortextos bus kb-ingest /path/to/docs --org $CTX_ORG --scope shared
-
-# Ingest to your private collection (only visible to you)
-cortextos bus kb-ingest /path/to/docs --org $CTX_ORG --agent $CTX_AGENT_NAME --scope private
-```
-
-### When to query
-- Before starting a research task - check if knowledge already exists
-- When referencing named entities (people, projects, tools) - check for existing context
-- When answering factual questions about the org - query before searching externally
-
-### When to ingest
-- After completing substantive research (always ingest your findings)
-- After writing or updating MEMORY.md (knowledge persists across sessions)
-- After learning important facts about the org, users, or systems
-
-### List collections
-```bash
-cortextos bus kb-collections --org $CTX_ORG
-```
-
-### First-time setup (if knowledge base not initialized)
-```bash
-cortextos bus kb-setup --org $CTX_ORG
-```
+Query and ingest org documents using natural language. See `.claude/skills/knowledge-base/SKILL.md` for full reference.
