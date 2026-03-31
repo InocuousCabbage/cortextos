@@ -6,6 +6,9 @@ node_modules/
 # Include template .claude dirs (needed for agent settings.json)
 !templates/**/.claude/
 !templates/**/.claude/**
+# Include agent skills in orgs (same as templates pattern)
+!orgs/**/.claude/
+!orgs/**/.claude/**
 dist/
 
 # Secrets

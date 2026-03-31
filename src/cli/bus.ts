@@ -1001,11 +1001,11 @@ busCommand
 
     // Merge in priority order: framework < template < agent (agent wins)
     const merged = new Map<string, object>();
-    for (const [k, v] of scanSkillsDir(join(frameworkRoot, 'skills'), 'framework')) merged.set(k, v);
+    for (const [k, v] of scanSkillsDir(join(frameworkRoot, '.claude', 'skills'), 'framework')) merged.set(k, v);
     if (template) {
-      for (const [k, v] of scanSkillsDir(join(frameworkRoot, 'templates', template, 'skills'), `template:${template}`)) merged.set(k, v);
+      for (const [k, v] of scanSkillsDir(join(frameworkRoot, 'templates', template, '.claude', 'skills'), `template:${template}`)) merged.set(k, v);
     }
-    for (const [k, v] of scanSkillsDir(join(agentDir, 'skills'), 'agent')) merged.set(k, v);
+    for (const [k, v] of scanSkillsDir(join(agentDir, '.claude', 'skills'), 'agent')) merged.set(k, v);
 
     const skills = Array.from(merged.values()).sort((a: any, b: any) => a.name.localeCompare(b.name));
 

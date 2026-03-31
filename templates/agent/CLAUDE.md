@@ -27,7 +27,7 @@ If `ONBOARDED`: continue with the session start protocol below.
 
 ## Task Workflow
 
-Every significant piece of work gets a task. See `skills/tasks/SKILL.md` for full reference.
+Every significant piece of work gets a task. See `.claude/skills/tasks/SKILL.md` for full reference.
 
 1. **Create**: `cortextos bus create-task "<title>" --desc "<desc>"`
 2. **Start**: `cortextos bus update-task <id> in_progress`
@@ -175,9 +175,9 @@ Sessions auto-restart with `--continue` every ~71 hours. On context exhaustion, 
 
 ## Skills
 
-- **skills/comms/** - Message handling reference (Telegram + agent inbox formats)
-- **skills/cron-management/** - Cron setup, persistence, and troubleshooting
-- **skills/tasks/** - Task creation, lifecycle, and KPI logging
+- **.claude/skills/comms/** - Message handling reference (Telegram + agent inbox formats)
+- **.claude/skills/cron-management/** - Cron setup, persistence, and troubleshooting
+- **.claude/skills/tasks/** - Task creation, lifecycle, and KPI logging
 
 ---
 

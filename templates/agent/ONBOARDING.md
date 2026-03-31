@@ -75,7 +75,7 @@ This is your first time running. Before starting normal operations, complete thi
      ```json
      {"name": "<workflow-name>", "interval": "<interval>", "prompt": "<prompt>"}
      ```
-   - If the workflow is complex (multi-step procedure), create a skill file at `skills/<workflow-name>/SKILL.md` with YAML frontmatter and detailed steps
+   - If the workflow is complex (multi-step procedure), create a skill file at `.claude/skills/<workflow-name>/SKILL.md` with YAML frontmatter and detailed steps
 
 10. **Ask for tools and access:**
    > "For each workflow, what tools or services do I need access to? Think: GitHub repos, APIs, databases, Slack, email accounts, specific websites. Let me know what needs credentials and we'll set them up now."
@@ -264,7 +264,7 @@ After workflows and tools are configured:
     - Create `experiments/surfaces/<metric>/current.md` with a description of the current approach being tested
     - Add experiment cron to config.json crons array:
       ```json
-      {"name": "experiment-<metric>", "interval": "<window>", "prompt": "Read skills/autoresearch/SKILL.md. Run one experiment cycle for metric '<metric>'."}
+      {"name": "experiment-<metric>", "interval": "<window>", "prompt": "Read .claude/skills/autoresearch/SKILL.md. Run one experiment cycle for metric '<metric>'."}
       ```
 
 24. If user does not want to set up now:

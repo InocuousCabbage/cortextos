@@ -145,7 +145,7 @@ After monitoring priorities are collected:
    For each cron:
    - Create via `/loop <interval> <prompt>`
    - Add to `config.json` under `crons` array
-   - If complex, create a skill file at `skills/<workflow-name>/SKILL.md`
+   - If complex, create a skill file at `.claude/skills/<workflow-name>/SKILL.md`
 
 14. **Ask for tools and access:**
     > "What systems should I monitor beyond the agent infrastructure? Databases, APIs, dashboards, CI/CD pipelines? If I can see it, I can watch it."
@@ -296,7 +296,7 @@ After monitoring priorities are collected:
 
 27. **If theta wave enabled**, add cron to config.json:
     ```json
-    {"name": "theta-wave", "interval": "24h", "prompt": "Read skills/theta-wave/SKILL.md. Initiate the theta wave cycle. First action: message the orchestrator that theta wave is starting and share your initial system scan."}
+    {"name": "theta-wave", "interval": "24h", "prompt": "Read .claude/skills/theta-wave/SKILL.md. Initiate the theta wave cycle. First action: message the orchestrator that theta wave is starting and share your initial system scan."}
     ```
 
 ## Part 8: Dashboard Walkthrough

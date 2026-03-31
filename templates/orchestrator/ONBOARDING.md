@@ -99,7 +99,7 @@ After identity is established, collect behavioral configuration:
      ```json
      {"name": "<workflow-name>", "interval": "<interval>", "prompt": "<prompt>"}
      ```
-   - If the workflow is complex, create a skill file at `skills/<workflow-name>/SKILL.md`
+   - If the workflow is complex, create a skill file at `.claude/skills/<workflow-name>/SKILL.md`
 
 12. **Customize HEARTBEAT.md:**
     > "One quick question about how I monitor things. How long before a goal is considered stale and needs review? (default: 7 days) And how long before a task with no updates gets flagged as stale? (default: 3 days)"

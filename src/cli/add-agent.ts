@@ -46,7 +46,7 @@ export const addAgentCommand = new Command('add-agent')
     // Create agent directory
     mkdirSync(agentDir, { recursive: true });
     mkdirSync(join(agentDir, 'memory'), { recursive: true });
-    mkdirSync(join(agentDir, 'skills'), { recursive: true });
+    mkdirSync(join(agentDir, '.claude', 'skills'), { recursive: true });
 
     // Copy template files
     const templateDir = findTemplateDir(projectRoot, options.template);
