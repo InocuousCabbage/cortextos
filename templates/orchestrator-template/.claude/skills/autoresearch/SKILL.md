@@ -17,7 +17,7 @@ You have research cycles assigned to you (check `experiments/config.json`). Each
 - A **measurement window** (how long to wait before measuring)
 - A **measurement method** (how to get the metric value)
 
-You CANNOT modify your own cycle configuration. Only the analyst (via theta wave) can create, modify, or remove your cycles. You CAN and SHOULD run experiments within your assigned cycles.
+You cannot autonomously modify your own cycle configuration. If the user asks you to modify a cycle, you can. Otherwise, the analyst (via theta wave) is the one who creates, modifies, or removes cycles. You CAN and SHOULD run experiments within your assigned cycles.
 
 ## The Experiment Loop
 
@@ -95,9 +95,56 @@ cortextos bus evaluate-experiment <id> 0 --score 7 --justification "Output is mo
 ### Qualitative (comparative)
 You compare baseline vs experiment output side by side and score 1-10.
 
+## Setting Up a Cycle (Orchestrator-Specific)
+
+Orchestrator-appropriate metrics to suggest to the user:
+- **briefing_quality** — qualitative score 1-10 on how useful morning/evening briefings are (surface: SOUL.md or a briefing prompt file)
+- **approval_routing_speed** — quantitative: minutes from approval created to user Telegram notification (computed from event log timestamps)
+- **goal_cascade_alignment** — qualitative score 1-10 on how well agents' tasks match the north star (surface: goal-management skill or SOUL.md)
+
+If the user wants to set up a cycle, collect:
+1. **Metric** — which of the above (or their own choice)
+2. **Metric type** — quantitative (scripted/computed) or qualitative (you score 1-10 each cycle)
+3. **Surface** — the file to experiment on
+4. **Direction** — higher or lower is better (usually higher)
+5. **Window** — how long to wait before measuring (e.g., `72h` for briefing quality — needs a few days of data)
+6. **Loop interval** — how often to run the experiment loop
+7. **Approval** — should each experiment need your approval before running?
+
+Then create the cycle and surface directory:
+```bash
+mkdir -p "experiments/surfaces/<metric>"
+cat > "experiments/surfaces/<metric>/current.md" << 'EOF'
+# <metric> — Baseline
+
+[Describe the current approach being tested]
+EOF
+
+cortextos bus manage-cycle create $CTX_AGENT_NAME \
+  --cycle "<metric_name>" \
+  --metric "<metric_name>" \
+  --metric-type "<quantitative|qualitative>" \
+  --surface "experiments/surfaces/<metric>/current.md" \
+  --direction "higher" \
+  --window "<e.g. 72h>" \
+  --measurement "<how to measure>" \
+  --loop-interval "<e.g. 72h>"
+```
+
+Then set up the cron:
+```bash
+/loop <loop_interval> Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop.
+# Add to config.json crons: {"name": "experiment-<metric>", "interval": "<loop_interval>", "prompt": "Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop."}
+```
+
+To modify a cycle when the user asks:
+```bash
+cortextos bus manage-cycle modify $CTX_AGENT_NAME --cycle "<name>" --window "<new>" --loop-interval "<new>"
+```
+
 ## Important Rules
 
-1. You CANNOT modify your own cycle config (surfaces, metrics, timing). Only theta wave can.
+1. Never autonomously modify your own cycle config. If the user asks you to, you can.
 2. You MUST log learnings for EVERY experiment, including failures. Negative learnings are equally valuable.
 3. You MUST respect the measurement window - do not evaluate early.
 4. If approval_required is true, WAIT for approval before running.

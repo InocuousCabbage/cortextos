@@ -247,15 +247,30 @@ No configuration needed here — theta-wave is triggered by the analyst.
 
 ### Step 18: Autoresearch setup (orchestrator-specific)
 
-> "I can also run experiments on my own orchestration — testing better ways to cascade goals, surface approvals faster, or keep agents unblocked. Orchestrator metrics I could optimize:
-> - Briefing quality (how useful are my morning/evening briefings?)
-> - Approval routing speed (how fast do approvals get to you?)
-> - Goal cascade alignment (do agents' tasks actually reflect the north star?)
->
-> Want to set up an experiment cycle now, or skip for now and let the analyst configure it when they come online?"
+First, read `.claude/skills/autoresearch/SKILL.md` to understand the full experiment loop and setup commands.
 
-If yes: set up experiment config per `.claude/skills/autoresearch/SKILL.md`. Use orchestrator-appropriate metric and surface.
-If no: note it in memory for the analyst to configure.
+Then tell the user:
+> "I can run experiments on my own orchestration — testing better ways to cascade goals, surface approvals faster, or communicate. Metrics I could optimize:
+> - Briefing quality: how useful are my morning/evening briefings? (qualitative 1-10, experiment on the briefing prompt)
+> - Approval routing speed: how fast do approvals reach you? (quantitative via timestamp delta, experiment on my monitoring frequency)
+> - Goal cascade alignment: do agents' tasks actually reflect the north star? (qualitative 1-10, experiment on how I write agent goals)
+>
+> You don't need to set one up now — you can tell me to configure autoresearch anytime. Want to set up a cycle now?"
+
+If yes, collect:
+- Which metric to optimize
+- Measurement window (briefing quality needs a few days: 72h; approval routing can be 24h)
+- Loop interval (cron frequency — how often to run the experiment loop)
+- Approval required before running each experiment?
+
+Then set up following `.claude/skills/autoresearch/SKILL.md` setup steps exactly. The cycle must be created with `cortextos bus manage-cycle create` including `--loop-interval`. The cron must be set up immediately after:
+```
+/loop <loop_interval> Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop.
+```
+Add to `config.json` crons array.
+
+If no:
+> "No problem. You can tell me to configure autoresearch anytime, or the analyst will set it up when they come online."
 
 ---
 

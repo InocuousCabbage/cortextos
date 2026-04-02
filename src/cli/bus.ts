@@ -439,20 +439,26 @@ busCommand
   .argument('<action>', 'Action: create, modify, remove, list')
   .argument('<agent>', 'Agent name')
   .option('--metric <name>', 'Metric name')
-  .option('--surface <path>', 'Surface path')
+  .option('--metric-type <type>', 'Metric type: quantitative or qualitative')
+  .option('--surface <path>', 'Surface path (file to experiment on)')
   .option('--direction <dir>', 'Direction: higher or lower')
-  .option('--window <dur>', 'Measurement window')
+  .option('--window <dur>', 'Measurement window (how long before evaluating)')
+  .option('--measurement <method>', 'How to measure the metric')
+  .option('--loop-interval <dur>', 'Cron frequency for the experiment loop')
   .option('--cycle <name>', 'Cycle name')
-  .action((action: string, agent: string, opts: { metric?: string; surface?: string; direction?: string; window?: string; cycle?: string }) => {
+  .action((action: string, agent: string, opts: { metric?: string; metricType?: string; surface?: string; direction?: string; window?: string; measurement?: string; loopInterval?: string; cycle?: string }) => {
     const env = resolveEnv();
     const agentDir = env.agentDir || process.cwd();
     const cycles = manageCycle(agentDir, action as 'create' | 'modify' | 'remove' | 'list', {
       agent,
       name: opts.cycle,
       metric: opts.metric,
+      metric_type: opts.metricType as 'quantitative' | 'qualitative' | undefined,
       surface: opts.surface,
       direction: opts.direction as 'higher' | 'lower',
       window: opts.window,
+      measurement: opts.measurement,
+      loop_interval: opts.loopInterval,
     });
     console.log(JSON.stringify(cycles, null, 2));
   });

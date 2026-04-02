@@ -67,9 +67,15 @@ export interface ExperimentCycle {
   name: string;
   agent: string;
   metric: string;
+  metric_type: 'quantitative' | 'qualitative';
   surface: string;
   direction: 'higher' | 'lower';
   window: string;
+  measurement: string;
+  loop_interval: string;
+  enabled: boolean;
+  created_by: string;
+  created_at: string;
 }
 
 export interface ExperimentConfig {
@@ -381,9 +387,12 @@ export function manageCycle(
     agent?: string;
     name?: string;
     metric?: string;
+    metric_type?: 'quantitative' | 'qualitative';
     surface?: string;
     direction?: 'higher' | 'lower';
     window?: string;
+    measurement?: string;
+    loop_interval?: string;
   },
 ): ExperimentCycle[] {
   const config = loadConfig(agentDir);
@@ -400,9 +409,15 @@ export function manageCycle(
         name: options.name,
         agent: options.agent,
         metric: options.metric,
+        metric_type: options.metric_type || 'qualitative',
         surface: options.surface || '',
         direction: options.direction || 'higher',
         window: options.window || '24h',
+        measurement: options.measurement || '',
+        loop_interval: options.loop_interval || options.window || '24h',
+        enabled: true,
+        created_by: options.agent,
+        created_at: nowISO(),
       };
       config.cycles.push(cycle);
       saveConfig(agentDir, config);
@@ -418,9 +433,12 @@ export function manageCycle(
         throw new Error(`Cycle '${options.name}' not found`);
       }
       if (options.metric) config.cycles[idx].metric = options.metric;
+      if (options.metric_type) config.cycles[idx].metric_type = options.metric_type;
       if (options.surface) config.cycles[idx].surface = options.surface;
       if (options.direction) config.cycles[idx].direction = options.direction;
       if (options.window) config.cycles[idx].window = options.window;
+      if (options.measurement) config.cycles[idx].measurement = options.measurement;
+      if (options.loop_interval) config.cycles[idx].loop_interval = options.loop_interval;
       if (options.agent) config.cycles[idx].agent = options.agent;
       saveConfig(agentDir, config);
       return config.cycles;
