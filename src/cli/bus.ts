@@ -1087,11 +1087,9 @@ busCommand
   .description('Gracefully restart another agent by writing the restart marker then sending /exit')
   .argument('<agent>', 'Target agent name to restart')
   .argument('[reason]', 'Reason for restart', 'user request via soft-restart')
-  .action((targetAgent: string, reason: string) => {
-    const { mkdirSync, writeFileSync, existsSync } = require('fs');
+  .action(async (targetAgent: string, reason: string) => {
+    const { mkdirSync, writeFileSync } = require('fs');
     const { join } = require('path');
-    const { execSync } = require('child_process');
-    const { createConnection } = require('net');
     const env = resolveEnv();
     const ctxRoot = require('path').join(require('os').homedir(), '.cortextos', env.instanceId);
 
@@ -1101,28 +1099,22 @@ busCommand
     writeFileSync(join(stateDir, '.user-restart'), reason);
     console.log(`Wrote .user-restart marker for ${targetAgent}: ${reason}`);
 
-    // Step 2: Try IPC first (Node.js daemon), then fall back to tmux (bash daemon)
-    const sockPath = join(ctxRoot, 'daemon.sock');
-    if (existsSync(sockPath)) {
-      // Node.js daemon: send restart-agent via IPC
-      const client = createConnection(sockPath, () => {
-        client.write(JSON.stringify({ type: 'restart-agent', agent: targetAgent }));
-      });
-      client.on('data', (data: Buffer) => {
-        const resp = JSON.parse(data.toString());
-        if (resp.success) {
-          console.log(`Restarted ${targetAgent} via daemon IPC`);
-        } else {
-          console.error(`Daemon restart failed: ${resp.error}`);
-        }
-        client.destroy();
-      });
-      client.on('error', (err: Error) => {
-        console.error(`IPC error: ${err.message}`);
+    // Step 2: Try IPC first (cross-platform — named pipe on Windows, socket on Unix).
+    // Fall back to tmux only for backward compat with bash daemon on non-Windows.
+    const ipc = new IPCClient(env.instanceId);
+    const daemonRunning = await ipc.isDaemonRunning();
+
+    if (daemonRunning) {
+      const resp = await ipc.send({ type: 'restart-agent', agent: targetAgent });
+      if (resp.success) {
+        console.log(`Restarted ${targetAgent} via daemon IPC`);
+      } else {
+        console.error(`Daemon restart failed: ${resp.error}`);
         process.exit(1);
-      });
-    } else {
-      // Bash daemon: use tmux
+      }
+    } else if (process.platform !== 'win32') {
+      // Bash daemon fallback — tmux is Unix-only
+      const { execSync } = require('child_process');
       const tmuxName = env.org
         ? `ctx-${env.instanceId}-${env.org}-${targetAgent}`
         : `ctx-${env.instanceId}-${targetAgent}`;
@@ -1138,6 +1130,9 @@ busCommand
         console.log(`Sent /exit to ${targetAgent} (session: ${tmuxName})`);
         console.log('Agent will restart via launchd/wrapper. crash-alert will categorize as user_initiated.');
       }, 1000);
+    } else {
+      console.error('ERROR: Node daemon is not running. Start it with: cortextos start');
+      process.exit(1);
     }
   });
 
