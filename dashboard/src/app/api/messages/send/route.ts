@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[api/messages/send] Error:', message);
     return Response.json(
-      { error: 'Failed to send message' },
+      { error: 'Failed to send message', details: message },
       { status: 500 }
     );
   }

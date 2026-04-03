@@ -72,7 +72,7 @@ export async function PATCH(
     } catch (err) {
       console.error(`[api/agents/${decoded}] PATCH identity error:`, err);
       return Response.json(
-        { error: 'Failed to update identity' },
+        { error: 'Failed to update identity', detail: String(err), path: paths.identityMd },
         { status: 500 },
       );
     }
