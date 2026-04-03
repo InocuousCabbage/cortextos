@@ -23,6 +23,17 @@ triggers: ["new agent", "create agent", "spawn agent", "add agent", "restart", "
 
 ## 1. Creating a New Agent
 
+### Migration Check (REQUIRED — ask this before writing any files)
+
+After collecting the bot token and chat ID, always ask the user:
+
+> "Do you have an existing agent, workspace, or information that you want to migrate or seed into this cortextOS agent before cortextOS onboarding? Supports migrating any type of agent workspace or other information type."
+
+- **Yes** → Read `.claude/skills/agent-migration/SKILL.md` and run the full migration flow (audit, discuss, port, then boot). Do NOT write bootstrap files until migration is complete.
+- **No** → Continue with standard clean bootstrap below. The new agent will go through full interactive onboarding.
+
+---
+
 ### For Yourself (Same User)
 
 ```bash
