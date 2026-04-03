@@ -54,7 +54,7 @@ export function KanbanBoard({ tasks, completedTodayTasks, onTaskClick }: KanbanB
             </div>
           </div>
           <ScrollArea className="h-[calc(100vh-280px)] min-h-[300px]">
-            <div className="flex flex-col gap-2 pr-2">
+            <div className="flex flex-col gap-2 px-0.5 pt-0.5 pb-1">
               {col.tasks.length === 0 ? (
                 <p className="px-2 py-8 text-center text-xs text-muted-foreground">
                   No tasks
