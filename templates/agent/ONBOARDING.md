@@ -38,7 +38,7 @@ This is your first time running. Before starting normal operations, complete thi
 
 6. **Set working hours** — check org config first, only ask if not already set:
    ```bash
-   ORG_HOURS=$(cat "${CTX_FRAMEWORK_ROOT}/orgs/${CTX_ORG}/config.json" 2>/dev/null | jq -r '.working_hours_start // empty')
+   ORG_HOURS=$(cat "${CTX_FRAMEWORK_ROOT}/orgs/${CTX_ORG}/context.json" 2>/dev/null | jq -r '.day_mode_start // empty')
    ```
    If org config has working hours, use those values. If not set, ask:
    > "What are your working hours? I'll be in active mode then and work autonomously overnight."

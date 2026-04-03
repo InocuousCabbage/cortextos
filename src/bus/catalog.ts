@@ -7,6 +7,7 @@
 
 import { existsSync, readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, cpSync, rmSync } from 'fs';
 import { join, resolve, relative } from 'path';
+import { execSync } from 'child_process';
 import { ensureDir } from '../utils/atomic.js';
 
 // --- Types ---
@@ -481,7 +482,6 @@ export function submitCommunityItem(
 
   // --contribute: create branch, commit, push to origin, open PR against upstream
   if (options.contribute) {
-    const { execSync } = require('child_process');
     const execOpts = { cwd: frameworkRoot, encoding: 'utf-8' as const, timeout: 60000 };
 
     try {
@@ -566,7 +566,6 @@ export function submitCommunityItem(
   return {
     status: 'submitted',
     name: itemName,
-    branch,
     file_count: files.length,
   };
 }

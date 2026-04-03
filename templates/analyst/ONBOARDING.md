@@ -311,9 +311,12 @@ jq --argjson eco '{
 Read the day/night hours computed in Step 12. Pick a low-traffic time (1 hour after night mode starts) for daily background jobs:
 
 ```bash
-# Night start hour computed in Step 12 as $NIGHT_HOUR
-# Daily jobs run 1 hour into night mode to avoid disrupting day work
-DAILY_HOUR=$(( NIGHT_HOUR + 1 ))
+# Re-read night start hour from context.json (Step 12 computed it but that was a separate shell)
+ORG_CONTEXT=$(cat "${CTX_FRAMEWORK_ROOT}/orgs/${CTX_ORG}/context.json" 2>/dev/null || echo '{}')
+NIGHT_HOUR=$(echo "$ORG_CONTEXT" | jq -r '.day_mode_end // "18:00"' | cut -d: -f1 | sed 's/^0*//')
+NIGHT_HOUR=${NIGHT_HOUR:-18}
+# Daily jobs run 1 hour into night mode; modulo 24 prevents invalid cron hour
+DAILY_HOUR=$(( (NIGHT_HOUR + 1) % 24 ))
 ```
 
 For each enabled feature, create the cron and add to config.json:
@@ -393,7 +396,11 @@ Set `approval_required`, `auto_create_agent_cycles`, and `auto_modify_agent_cycl
 Compute the theta wave hour (2 hours into night mode, so it runs after auto-commit and check-upstream):
 
 ```bash
-TW_HOUR=$(( NIGHT_HOUR + 2 ))
+# Re-read night hour (each bash block is a separate shell invocation)
+ORG_CONTEXT=$(cat "${CTX_FRAMEWORK_ROOT}/orgs/${CTX_ORG}/context.json" 2>/dev/null || echo '{}')
+NIGHT_HOUR=$(echo "$ORG_CONTEXT" | jq -r '.day_mode_end // "18:00"' | cut -d: -f1 | sed 's/^0*//')
+NIGHT_HOUR=${NIGHT_HOUR:-18}
+TW_HOUR=$(( (NIGHT_HOUR + 2) % 24 ))
 ```
 
 Use CronCreate directly (time-anchored):

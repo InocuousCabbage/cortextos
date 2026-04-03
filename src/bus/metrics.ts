@@ -3,8 +3,9 @@
  * Node.js equivalent of bash collect-metrics.sh, scrape-usage.sh, check-upstream.sh
  */
 
-import { existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, readdirSync, mkdirSync } from 'fs';
+import { join, basename, dirname } from 'path';
+import { execSync } from 'child_process';
 import { ensureDir } from '../utils/atomic.js';
 
 // --- Types ---
@@ -272,7 +273,6 @@ export function storeUsageData(ctxRoot: string, data: UsageData): void {
   const dailyPath = join(usageDir, `${today}.jsonl`);
   const line = JSON.stringify(data) + '\n';
   try {
-    const { appendFileSync } = require('fs');
     appendFileSync(dailyPath, line, 'utf-8');
   } catch {
     writeFileSync(dailyPath, line, 'utf-8');
@@ -290,7 +290,6 @@ export function checkUpstream(
   frameworkRoot: string,
   options: { apply?: boolean } = {},
 ): UpstreamResult {
-  const { execSync } = require('child_process');
   const execOpts = { cwd: frameworkRoot, encoding: 'utf-8' as const, timeout: 30000 };
 
   // Check if it's a git repo
@@ -598,7 +597,6 @@ function parseSkillFrontmatter(filePath: string): { name?: string; description?:
 }
 
 function deriveNameFromPath(filePath: string): string {
-  const { basename, dirname } = require('path');
   const base = basename(filePath);
   if (base === 'SKILL.md') {
     return basename(dirname(filePath));
