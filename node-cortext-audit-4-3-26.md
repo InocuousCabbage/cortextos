@@ -588,3 +588,18 @@ if (pty) {
 - Write the selected model to `config.json` (e.g., `"model": "claude-sonnet-4-6"`) during onboarding
 - Daemon should pass `--model` flag when spawning agent sessions if `config.json` specifies one
 - Default: suggest role-appropriate model (orchestrator → opus, analyst → sonnet, specialist agent → sonnet or haiku depending on task complexity)
+
+---
+
+## 42. Dashboard CLI command doesn't pass CTX_ROOT/CTX_INSTANCE_ID to the process — causes cross-instance data bleed
+
+**What happens:** Running `cortextos dashboard` (or `pm2 start "npm start"` without explicit env) inherits the shell's environment. If the shell has `CTX_ROOT=/Users/.../.cortextos/default` from a previous session or launchd, the dashboard reads the wrong SQLite DB. Data from the old system (wrong agents, tasks, heartbeats, analytics) bleeds into the UI even when `CTX_INSTANCE_ID` in `.env.local` says otherwise — because `process.env` vars set in the shell override `.env.local`.
+
+**Severity:** High — causes complete cross-instance data bleed, makes the dashboard untrustworthy.
+
+**Root cause:** `dashboard.ts` CLI command writes `CTX_ROOT` into `.env.local` (for Next.js to read at build time), but the running process inherits shell env which takes precedence over `.env.local` at runtime. `db.ts` and `config.ts` read `process.env.CTX_ROOT` directly — so the shell value wins.
+
+**Fix needed:**
+- In `dashboard.ts` action, explicitly set `CTX_ROOT`, `CTX_INSTANCE_ID`, and `CTX_FRAMEWORK_ROOT` in the `dashEnv` object passed to `spawn()` — the process already constructs `dashEnv`, just ensure these three vars are included (they currently are, but verify the CLI path is used rather than raw `pm2 start` commands)
+- Add a startup log line: `[dashboard] CTX_ROOT=... CTX_INSTANCE_ID=...` so misconfigurations are immediately visible in logs
+- Document: never start the dashboard via raw `pm2 start "npm start"` without passing env vars explicitly
