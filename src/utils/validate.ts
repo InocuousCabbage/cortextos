@@ -83,3 +83,16 @@ export function isValidJson(str: string): boolean {
     return false;
   }
 }
+
+/**
+ * Strip terminal control sequences and non-printable characters from external input.
+ * Applied to all inbound Telegram text, captions, and callback data before PTY injection.
+ * Prevents terminal injection attacks via crafted Telegram messages.
+ */
+export function stripControlChars(input: string): string {
+  return input
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')    // ANSI CSI sequences (e.g. \e[31m)
+    .replace(/\x1b\][^\x07]*\x07/g, '')         // OSC sequences (e.g. \e]0;title\a)
+    .replace(/\x1b[^[\]]/g, '')                  // Other ESC sequences
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, ''); // Control chars (keep \t=0x09, \n=0x0a, \r=0x0d)
+}

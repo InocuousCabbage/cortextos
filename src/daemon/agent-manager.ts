@@ -9,6 +9,7 @@ import { resolvePaths } from '../utils/paths.js';
 import { resolveEnv } from '../utils/env.js';
 import { logInboundMessage, cacheLastSent, logOutboundMessage } from '../telegram/logging.js';
 import { collectTelegramCommands, registerTelegramCommands } from '../bus/metrics.js';
+import { stripControlChars } from '../utils/validate.js';
 
 /**
  * Manages all agents in a cortextOS instance.
@@ -148,7 +149,7 @@ export class AgentManager {
         }
 
         const from = msg.from?.first_name || msg.from?.username || 'Unknown';
-        const text = msg.text || '';
+        const text = stripControlChars(msg.text || msg.caption || '');
         const msgChatId = msg.chat?.id;
         const stateDir = join(this.ctxRoot, 'state', name);
 
@@ -166,7 +167,9 @@ export class AgentManager {
         const lastSent = FastChecker.readLastSent(stateDir, msgChatId ?? chatId ?? '');
 
         // Get reply-to text if this is a reply
-        const replyToText = msg.reply_to_message?.text;
+        const replyToText = msg.reply_to_message?.text
+          ? stripControlChars(msg.reply_to_message.text)
+          : undefined;
 
         // Format using standard formatter with context
         const formatted = FastChecker.formatTelegramTextMessage(

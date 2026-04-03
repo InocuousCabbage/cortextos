@@ -5,6 +5,7 @@ import { checkInbox, ackInbox } from '../bus/message.js';
 import { AgentProcess } from './agent-process.js';
 import type { TelegramAPI } from '../telegram/api.js';
 import { KEYS } from '../pty/inject.js';
+import { stripControlChars } from '../utils/validate.js';
 
 type LogFn = (msg: string) => void;
 
@@ -239,7 +240,7 @@ ${lastSentCtx}Reply using: cortextos bus send-telegram ${chatId} "<your reply>"
    * Routes to permission, restart, or AskUserQuestion handlers.
    */
   async handleCallback(query: TelegramCallbackQuery): Promise<void> {
-    const data = query.data || '';
+    const data = stripControlChars(query.data || '');
     const chatId = query.message?.chat?.id;
     const messageId = query.message?.message_id;
     const callbackQueryId = query.id;
