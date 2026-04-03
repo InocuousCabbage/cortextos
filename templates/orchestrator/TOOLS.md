@@ -1,7 +1,7 @@
 # Bus Script Reference - COMPLETE TOOL INVENTORY
 
 Every tool you have. Use them or the system cannot see your work.
-All scripts live at `$CTX_FRAMEWORK_ROOT/bus/`. Always invoke with `cortextos bus <script>`.
+All commands are available via `cortextos bus <command>`.
 
 ---
 
@@ -11,10 +11,10 @@ Environment variables are loaded in this order (later values override earlier):
 
 1. **Base shell** — PATH, HOME, SHELL, TERM (from OS)
 2. **CTX_* vars** — routing vars written by agent-pty at start (CTX_ROOT, CTX_AGENT_NAME, CTX_ORG, etc.)
-3. **orgs/{org}/.env** — shared secrets for all agents in the org
+3. **orgs/{org}/secrets.env** — shared secrets for all agents in the org
 4. **orgs/{org}/agents/{agent}/.env** — agent-specific secrets (override org values)
 
-**Shared secrets** (put in `orgs/{org}/.env` — one place, all agents get it):
+**Shared secrets** (put in `orgs/{org}/secrets.env` — one place, all agents get it):
 - `OPENAI_API_KEY` — if using OpenAI
 - `APIFY_TOKEN` — if using Apify actors
 - Any third-party API key used by multiple agents
@@ -45,7 +45,7 @@ cortextos bus create-task "<title>" --desc "<description>" [--assignee <agent>] 
 
 Example:
 ```bash
-cortextos bus create-task "Build landing page" --desc "Create homepage with hero section" --assignee developer --priority high
+cortextos bus create-task "Write blog post" --desc "Draft a 500-word post on agent orchestration" --priority normal
 ```
 
 ### update-task
@@ -78,7 +78,7 @@ Example:
 cortextos bus complete-task "task_abc123" --result "Deployed landing page to production. URL: https://site.com"
 ```
 
-### list-tasks.sh
+### list-tasks
 List and filter tasks. Use during every heartbeat to check your queue.
 
 ```bash
@@ -99,7 +99,7 @@ cortextos bus list-tasks --agent $CTX_AGENT_NAME --status pending
 
 ## Messages
 
-### send-message.sh
+### send-message
 Send a message to another agent. They will see it on their next inbox check.
 
 ```bash
@@ -116,7 +116,7 @@ Example:
 cortextos bus send-message <agent-name> high '{"action":"deploy","repo":"website","branch":"main"}'
 ```
 
-### check-inbox.sh
+### check-inbox
 Check for incoming messages from other agents. Run this EVERY heartbeat.
 
 ```bash
@@ -125,7 +125,7 @@ cortextos bus check-inbox
 
 Returns a list of messages. Each has an ID you must ACK.
 
-### ack-inbox.sh
+### ack-inbox
 Acknowledge a message. Un-ACK'd messages are re-delivered in 5 minutes.
 
 ```bash
@@ -141,32 +141,32 @@ cortextos bus ack-inbox "msg_xyz789"
 
 ## Events
 
-### log-event.sh
+### log-event
 Log a structured event. Events are the primary way the dashboard tracks your activity.
 No events = you look dead. Log aggressively.
 
 ```bash
-cortextos bus log-event <category> <event_name> <severity> '[json_payload]'
+cortextos bus log-event <category> <event_name> <severity> --meta '<json_payload>'
 ```
 
-- **category** (required): `heartbeat` | `task` | `comms` | `error` | `system` | `work`
-- **event_name** (required): Descriptive event name (e.g., `agent_heartbeat`, `task_completed`, `deploy_started`)
+- **category** (required): `action` | `task` | `heartbeat` | `message` | `approval` | `error` | `metric` | `milestone`
+- **event_name** (required): Descriptive event name (e.g., `session_start`, `task_completed`, `deploy_started`)
 - **severity** (required): `info` | `warning` | `error` | `critical`
-- **json_payload** (optional): Structured data as JSON string
+- **--meta** (optional): Metadata as JSON string
 
 Examples:
 ```bash
 cortextos bus log-event heartbeat agent_heartbeat info --meta '{"agent":"'$CTX_AGENT_NAME'"}'
 cortextos bus log-event task task_completed info --meta '{"task_id":"task_abc123","summary":"Deployed site"}'
 cortextos bus log-event error deploy_failed error --meta '{"repo":"website","error":"build timeout"}'
-cortextos bus log-event work research_complete info --meta '{"topic":"competitor analysis","findings":3}'
+cortextos bus log-event action research_complete info --meta '{"topic":"competitor analysis","findings":3}'
 ```
 
 ---
 
 ## Heartbeat
 
-### update-heartbeat.sh
+### update-heartbeat
 Update your heartbeat timestamp and status. This is how the system knows you are alive.
 If you do not call this, the dashboard shows you as DEAD.
 
@@ -183,9 +183,48 @@ cortextos bus update-heartbeat "WORKING ON: Implementing user auth for the dashb
 
 ---
 
+## Knowledge Base (RAG)
+
+Semantic vector store for persistent, searchable memory. Requires `GEMINI_API_KEY` in `orgs/$CTX_ORG/secrets.env`.
+
+### kb-query
+Search indexed documents using natural language.
+
+```bash
+cortextos bus kb-query "<question>" --org $CTX_ORG --agent $CTX_AGENT_NAME
+# Query a specific collection
+cortextos bus kb-query "<question>" --org $CTX_ORG --collection memory-$CTX_AGENT_NAME
+```
+
+### kb-ingest
+Index files or directories into a KB collection.
+
+```bash
+cortextos bus kb-ingest <path> --org $CTX_ORG --agent $CTX_AGENT_NAME --scope private [--collection <name>] [--force]
+# Ingest to org shared collection
+cortextos bus kb-ingest <path> --org $CTX_ORG --scope shared
+```
+
+### kb-collections
+List available KB collections for the org.
+
+```bash
+cortextos bus kb-collections --org $CTX_ORG
+```
+
+**Three standard collections:**
+
+| Collection | Scope | Purpose |
+|---|---|---|
+| `memory-{agent}` | Private | MEMORY.md + daily memory — auto-ingested every heartbeat |
+| `private-{agent}` | Private | Agent outputs, research docs, workspace files |
+| `shared-{org}` | Org-wide | Research findings, reports, shared org knowledge |
+
+---
+
 ## Approvals
 
-### create-approval.sh
+### create-approval
 Request human approval before taking a high-stakes action. Required for: external comms, production deploys, data deletion, financial commitments.
 
 ```bash
@@ -193,15 +232,15 @@ cortextos bus create-approval "<title>" <category> "[context]"
 ```
 
 - **title** (required): What you are requesting approval for
-- **category** (required): `deploy` | `comms` | `financial` | `data` | `other`
+- **category** (required): `external-comms` | `financial` | `deployment` | `data-deletion` | `other`
 - **context** (optional): Additional details to help the human decide
 
 Example:
 ```bash
-cortextos bus create-approval "Send cold outreach to 50 leads" comms "Draft email attached in task_abc123. Target list: SaaS founders."
+cortextos bus create-approval "Send cold outreach to 50 leads" external-comms "Draft email attached in task_abc123. Target list: SaaS founders."
 ```
 
-### update-approval.sh
+### update-approval
 Resolve an approval request (typically called by the system after human responds via Telegram).
 
 ```bash
@@ -217,7 +256,7 @@ cortextos bus update-approval "appr_123" approved "User approved via Telegram"
 
 ## Telegram
 
-### send-telegram.sh
+### send-telegram
 Send a message to the user via Telegram. Use for urgent updates, approval requests, and status reports.
 Do NOT spam. Reserve for things the user actually needs to see.
 
@@ -233,14 +272,14 @@ Example:
 cortextos bus send-telegram "$CTX_TELEGRAM_CHAT_ID" "Task completed: Landing page deployed to production. URL: https://site.com"
 ```
 
-### edit-message.sh
+### edit-message
 Edit an existing Telegram message (e.g., to update a status message in-place).
 
 ```bash
 cortextos bus edit-message <chat_id> <message_id> "<new_text>" [reply_markup_json]
 ```
 
-### answer-callback.sh
+### answer-callback
 Answer a Telegram callback query to dismiss button loading state.
 
 ```bash
@@ -251,14 +290,14 @@ cortextos bus answer-callback <callback_query_id> [toast_text]
 
 ## Discovery
 
-### list-agents.sh
+### list-agents
 Discover all agents in the system.
 
 ```bash
 cortextos bus list-agents [--org <org>] [--format json|text] [--status running|all]
 ```
 
-### list-skills.sh
+### list-skills
 List available skills for the current agent.
 
 ```bash
@@ -269,51 +308,51 @@ cortextos bus list-skills [--format text|json]
 Aggregate all agent heartbeats into a single JSON object keyed by agent name.
 
 ```bash
-cortextos bus read-all-heartbeats [--brief]
+cortextos bus read-all-heartbeats [--format json|text]
 ```
 
-- **--brief**: Omit `current_task` and `loop_interval` fields (~60% smaller output). Use during automated heartbeat checks.
+- **--format**: Output format. `json` for machine-readable (default: `text`).
 
 ---
 
 ## Fleet Health
 
-### check-stale-tasks.sh
+### check-stale-tasks
 Find stale tasks: in_progress >2h, pending >24h, stale human tasks, overdue.
 
 ```bash
 cortextos bus check-stale-tasks [--all-orgs]
 ```
 
-### check-goal-staleness.sh
+### check-goal-staleness
 Check each agent's GOALS.md Updated timestamp. Flags goals older than threshold.
 
 ```bash
 cortextos bus check-goal-staleness [--threshold DAYS] [--json]
 ```
 
-### check-human-tasks.sh
+### check-human-tasks
 Check for stale human-assigned tasks and send reminders.
 
 ```bash
 cortextos bus check-human-tasks
 ```
 
-### archive-tasks.sh
+### archive-tasks
 Archive completed tasks older than 7 days.
 
 ```bash
 cortextos bus archive-tasks [--dry-run] [--all-orgs]
 ```
 
-### notify-agent.sh
+### notify-agent
 Send an urgent signal to another agent's fast-checker (bypasses normal inbox polling).
 
 ```bash
 cortextos bus notify-agent <agent_name> "<message>"
 ```
 
-### post-activity.sh
+### post-activity
 Post a message to the org's Telegram activity channel.
 
 ```bash
@@ -324,35 +363,35 @@ cortextos bus post-activity "<message>"
 
 ## Experiments (Theta Wave)
 
-### create-experiment.sh
+### create-experiment
 Create a new experiment proposal. For system-scope, auto-creates an approval.
 
 ```bash
 cortextos bus create-experiment <metric_name> "<hypothesis>" [--surface <path>] [--direction higher|lower] [--window <duration>] [--measurement <cmd>]
 ```
 
-### run-experiment.sh
+### run-experiment
 Start running a proposed experiment.
 
 ```bash
 cortextos bus run-experiment <experiment_id> [changes_description]
 ```
 
-### evaluate-experiment.sh
+### evaluate-experiment
 Evaluate a running experiment and decide keep/discard.
 
 ```bash
 cortextos bus evaluate-experiment <experiment_id> <measured_value> [--score <1-10>] [--justification "<text>"]
 ```
 
-### list-experiments.sh
+### list-experiments
 List experiments with filters.
 
 ```bash
 cortextos bus list-experiments [--agent <name>] [--status <status>] [--metric <name>] [--limit <N>] [--json]
 ```
 
-### gather-context.sh
+### gather-context
 Collect experiment context for hypothesis generation.
 
 ```bash
@@ -363,28 +402,28 @@ cortextos bus gather-context [--agent <name>] [--metric <name>] [--format json|m
 
 ## Lifecycle
 
-### self-restart.sh
+### self-restart
 Restart with `--continue` (preserves conversation history).
 
 ```bash
 cortextos bus self-restart --reason "why"
 ```
 
-### hard-restart.sh
+### hard-restart
 Kill and relaunch (fresh session, no history).
 
 ```bash
 cortextos bus hard-restart --reason "why"
 ```
 
-### auto-commit.sh
+### auto-commit
 Automatic daily snapshot of agent workspace changes. Local only, never pushes.
 
 ```bash
 cortextos bus auto-commit [--dry-run]
 ```
 
-### check-upstream.sh
+### check-upstream
 Check for framework updates from the canonical repo.
 
 ```bash
@@ -414,28 +453,28 @@ cortextos goals generate-md --agent boris --org lifeos
 
 ## Community Ecosystem
 
-### browse-catalog.sh
+### browse-catalog
 Browse community catalog for skills, agents, or org templates.
 
 ```bash
 cortextos bus browse-catalog [--type skill|agent|org] [--tag <tag>] [--search <query>]
 ```
 
-### install-community-item.sh
+### install-community-item
 Install a community catalog item.
 
 ```bash
 cortextos bus install-community-item <item-name> [--dry-run]
 ```
 
-### prepare-submission.sh
+### prepare-submission
 Prepare a skill/agent/org for community submission (PII scan + staging).
 
 ```bash
 cortextos bus prepare-submission <type> <source-path> <item-name> [--dry-run]
 ```
 
-### submit-community-item.sh
+### submit-community-item
 Submit a prepared item to the community catalog.
 
 ```bash
@@ -459,7 +498,9 @@ cortextos bus submit-community-item <item-name> <item-type> "<description>" [--d
 | Leave a trail                     | `log-event`               |
 | Ask permission                    | `create-approval`         |
 | Alert the user                    | `send-telegram`           |
+| Edit a Telegram message           | `edit-message`            |
 | Post to activity channel          | `post-activity`           |
+| Urgently signal another agent     | `notify-agent`            |
 | Find all agents                   | `list-agents`             |
 | Find available skills             | `list-skills`             |
 | Check fleet heartbeats            | `read-all-heartbeats`     |

@@ -236,18 +236,25 @@ Skill = directory with SKILL.md (YAML frontmatter + markdown body); discovery: f
 
 Types: raw skill, chained skills, skill+tool pair, skill+cron
 
-### 4.2a Autoresearch (experiments) cron — ❌ not wired up per agent
+### 4.2a Autoresearch (experiments) cron — ✅ wired up in onboarding
 
-The `autoresearch/SKILL.md` skill exists in every agent template but is intentionally NOT in the default cron list. It must be configured per-agent during onboarding.
+The `autoresearch/SKILL.md` skill exists in every agent template and is intentionally NOT in the default cron list. It must be configured per-agent — either during onboarding or any time the user requests it later.
 
-Required action (part of onboarding chain redesign — Layer 5):
-- During each agent's onboarding, ask: "What metric do you want to optimize?" and "How often should I run experiments?"
-- Create a cron entry: `{"name": "experiment-<metric>", "interval": "<window>", "prompt": "Read .claude/skills/autoresearch/SKILL.md. Run one experiment cycle for metric '<metric>'."}`
-- Add to that agent's `config.json` crons array
-- Create `experiments/config.json` and `experiments/surfaces/<metric>/current.md` for the agent
+**Implemented:**
+- `experiments/config.json` ships in both `templates/agent/` and `templates/orchestrator-template/` with `{approval_required: true, cycles: []}`
+- `cortextos bus manage-cycle create` now includes all fields the dashboard expects: `metric_type`, `measurement`, `loop_interval`, `enabled`, `created_by`, `created_at`
+- `autoresearch/SKILL.md` updated in both templates with correct setup commands
+- Agent ONBOARDING.md Part 5 (steps 21-24) updated to use `manage-cycle create` + set up cron immediately
+- Orchestrator ONBOARDING.md Step 18 updated with orch-specific metrics + same flow
+- SKILL.md rule fixed: "cannot autonomously modify" (user-directed changes are allowed)
+
+**Cycle creation flow (applies whenever a cycle is created):**
+1. Collect: metric, metric_type, surface, direction, window (measurement), loop_interval (cron frequency), measurement method, approval_required
+2. `cortextos bus manage-cycle create $CTX_AGENT_NAME --cycle <name> --metric <m> --metric-type <t> --surface <s> --direction <d> --window <w> --measurement <how> --loop-interval <freq>`
+3. Set up cron immediately: `/loop <loop_interval> Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop.` + add to config.json crons
 
 This applies to ALL agents (specialist, analyst, orchestrator). The metric and surface are role-specific.
-Ensure this step is in the specialist, analyst, and orchestrator onboarding flows when Layer 5 is redesigned.
+Analyst ONBOARDING.md still needs the same update when Layer 5 redesign is done.
 
 ### 4.3 Analyst metrics collection — 🔲 not audited
 

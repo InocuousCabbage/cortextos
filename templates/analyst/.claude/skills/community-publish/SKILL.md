@@ -54,15 +54,19 @@ Send via Telegram:
 ### Step 4: Submit to community
 
 ```bash
-cortextos bus submit-community-item <item-name> <type> "<description>"
+# Local submission only (adds to local catalog, no PR)
+cortextos bus submit-community-item <item-name> <type> "<description>" --author "<your-name>"
+
+# Full contribution (branch + push to origin + open PR against upstream)
+cortextos bus submit-community-item <item-name> <type> "<description>" --author "<your-name>" --contribute
 ```
 
-This:
-1. Creates a git branch
+The `--contribute` flag:
+1. Creates a git branch `community/<item-name>`
 2. Copies clean files to community/ directory
 3. Adds entry to catalog.json
-4. Pushes to the user's fork
-5. Opens a PR to the upstream repo
+4. Commits and pushes branch to `origin` (your fork)
+5. Opens a PR against `upstream` (canonical cortextOS repo) via `gh` CLI
 
 ### Step 5: Report
 
@@ -74,9 +78,9 @@ Requires `ecosystem.community_publish.enabled: true` in config.json.
 
 ## Prerequisites
 
-- User must have a fork of the cortextOS repo
-- Fork remote must be configured: `git remote add fork <fork-url>`
-- gh CLI must be authenticated
+- User must have a fork of the cortextOS repo configured as `origin`
+- `upstream` remote must point to the canonical cortextOS repo (set during install)
+- `gh` CLI must be authenticated (`gh auth login`)
 
 ## Safety
 

@@ -15,11 +15,7 @@ Use these to detect and surface problems before they become crises.
 Find tasks that have been in-progress too long or pending without action:
 
 ```bash
-# Current org only
 cortextos bus check-stale-tasks
-
-# All orgs
-cortextos bus check-stale-tasks --all-orgs
 ```
 
 Flags:

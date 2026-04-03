@@ -174,6 +174,44 @@ export const doctorCommand = new Command('doctor')
       });
     }
 
+    // Check gh CLI (needed for community publishing --contribute)
+    try {
+      const ghVersion = execSync('gh --version', { encoding: 'utf-8', stdio: 'pipe', timeout: 5000 }).trim().split('\n')[0];
+      checks.push({ name: 'gh CLI', status: 'pass', message: ghVersion });
+    } catch {
+      checks.push({
+        name: 'gh CLI',
+        status: 'warn',
+        message: 'Not installed',
+        fix: 'Install with: brew install gh (macOS) or https://cli.github.com',
+      });
+    }
+
+    // Check upstream git remote (needed for check-upstream and community --contribute)
+    const frameworkRoot = process.cwd();
+    if (existsSync(join(frameworkRoot, '.git'))) {
+      try {
+        execSync('git remote get-url upstream', { encoding: 'utf-8', stdio: 'pipe', cwd: frameworkRoot });
+        checks.push({ name: 'upstream remote', status: 'pass', message: 'Configured' });
+      } catch {
+        checks.push({
+          name: 'upstream remote',
+          status: 'warn',
+          message: 'Not configured',
+          fix: 'Run: git remote add upstream <canonical-cortextos-repo-url>',
+        });
+      }
+    }
+
+    // Check community/catalog.json (needed for browse-catalog and install-community-item)
+    const catalogPath = join(frameworkRoot, 'community', 'catalog.json');
+    checks.push({
+      name: 'community/catalog.json',
+      status: existsSync(catalogPath) ? 'pass' : 'warn',
+      message: existsSync(catalogPath) ? 'Found' : 'Not found',
+      fix: !existsSync(catalogPath) ? 'Run: cortextos bus check-upstream --apply to fetch the latest catalog' : undefined,
+    });
+
     // Display results
     let hasFailures = false;
     for (const check of checks) {

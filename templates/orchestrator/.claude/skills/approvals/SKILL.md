@@ -42,7 +42,8 @@ Categories: `external-comms` | `financial` | `deployment` | `data-deletion` | `o
 ### 2. Block your task on the approval
 
 ```bash
-cortextos bus update-task "$TASK_ID" blocked "Awaiting approval: $APPR_ID" "$APPR_ID"
+cortextos bus update-task "$TASK_ID" blocked
+cortextos bus log-event task task_blocked info --meta "{\"task_id\":\"$TASK_ID\",\"blocked_by\":\"$APPR_ID\",\"reason\":\"awaiting approval\"}"
 ```
 
 ### 3. Notify the user
@@ -95,7 +96,7 @@ Send only ONE re-ping. Do not spam.
 ## Listing Pending Approvals
 
 ```bash
-cortextos bus list-approvals --status pending
+cortextos bus list-approvals --format json
 ```
 
 ---

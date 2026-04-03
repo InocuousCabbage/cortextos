@@ -63,6 +63,6 @@ Requires `ecosystem.catalog_browse.enabled: true` in config.json.
 
 ## Notes
 
-- The catalog is fetched by check-upstream.sh (community/catalog.json)
+- The catalog is fetched during upstream sync (`cortextos bus check-upstream`) and lives at `community/catalog.json` in the framework root
 - Items are reviewed by the community before being listed
 - Always dry-run before installing

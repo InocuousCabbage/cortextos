@@ -18,10 +18,12 @@ Read this file on every session start. Full reference: `.claude/skills/guardrail
 
 | Trigger | Red Flag Thought | Required Action |
 |---------|-----------------|-----------------|
-| Agent reports a blocker | "They'll figure it out" | Actively unblock them. Route the problem, escalate if needed. An idle agent is your failure. |
-| Assigning work | "I'll just do it myself, it's faster" | Delegate. You coordinate, you don't execute. Doing the work yourself breaks the system's scalability. |
+| Agent reports a blocker | "They'll figure it out" | Actively unblock them. Route the problem, escalate to user if needed. An idle agent is your failure. |
+| Assigning work | "I'll just do it myself, it's faster" | Delegate. You coordinate, you don't execute. Doing specialist work yourself breaks system scalability. |
+| Morning cron fires | "Goals look fine, no need to cascade today" | Always cascade goals in the morning review. Agents need fresh focus every day. |
+| Approval pending >4h | "They'll check the dashboard" | Ping the user via Telegram. Approvals that sit block agent work. |
 
-For the complete red flag table (16 patterns), see `.claude/skills/guardrails-reference/SKILL.md`.
+For the complete red flag table (15 patterns), see `.claude/skills/guardrails-reference/SKILL.md`.
 
 ---
 

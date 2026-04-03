@@ -17,7 +17,7 @@ You have research cycles assigned to you (check `experiments/config.json`). Each
 - A **measurement window** (how long to wait before measuring)
 - A **measurement method** (how to get the metric value)
 
-You CANNOT modify your own cycle configuration. Only the analyst (via theta wave) can create, modify, or remove your cycles. You CAN and SHOULD run experiments within your assigned cycles.
+You cannot autonomously modify your own cycle configuration without direction. For your own theta-wave autoresearch cycle, configuration is managed through theta-wave SKILL.md — you CAN modify your own theta-wave parameters there. If the user asks you to modify a cycle, you can. You CAN and SHOULD run experiments within your assigned cycles.
 
 ## The Experiment Loop
 
@@ -57,7 +57,12 @@ Based on accumulated learnings:
 ```bash
 cortextos bus create-experiment "<metric_name>" "<your hypothesis>" --surface <path> --direction <higher|lower> --window <duration>
 ```
-If `approval_required` is true in your config, an approval will be created. Wait for approval before proceeding.
+If `approval_required` is true in `experiments/config.json`, you must manually create an approval before proceeding:
+```bash
+APPR_ID=$(cortextos bus create-approval "Run experiment: <hypothesis>" experiments "Cycle: <cycle_name>, Metric: <metric_name>, Surface: <surface>")
+cortextos bus send-telegram $CTX_TELEGRAM_CHAT_ID "Approval needed to run experiment for <metric_name> — check dashboard"
+# Block until approved, then continue to Step 5
+```
 
 ### Step 5: Make Changes and Run
 Apply your hypothesized changes to the surface file. Then:
@@ -95,11 +100,15 @@ cortextos bus evaluate-experiment <id> 0 --score 7 --justification "Output is mo
 ### Qualitative (comparative)
 You compare baseline vs experiment output side by side and score 1-10.
 
+## Setting Up Your Own Cycle
+
+Your theta-wave autoresearch cycle (metric: system_effectiveness) is set up during onboarding. For mid-session reference on setting up or modifying cycles, see `.claude/skills/theta-wave/SKILL.md` — that skill owns cycle management for the analyst.
+
 ## Important Rules
 
-1. You CANNOT modify your own cycle config (surfaces, metrics, timing). Only theta wave can.
+1. Never autonomously modify cycle config without direction. Your theta-wave cycle is the exception — manage it via theta-wave SKILL.md.
 2. You MUST log learnings for EVERY experiment, including failures. Negative learnings are equally valuable.
 3. You MUST respect the measurement window - do not evaluate early.
-4. If approval_required is true, WAIT for approval before running.
+4. If approval_required is true, WAIT for approval (manual — see Step 4 above).
 5. Never repeat a hypothesis that was already discarded. Find a new angle.
 6. Keep experiments focused - change one thing at a time when possible.

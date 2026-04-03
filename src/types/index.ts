@@ -116,6 +116,21 @@ export interface Approval {
 
 // Agent Config Types (config.json)
 
+export interface EcosystemFeatureConfig {
+  enabled?: boolean;
+}
+
+export interface EcosystemConfig {
+  /** Daily git snapshots of agent workspace. Agent stages safe files, reviews diff, commits. */
+  local_version_control?: EcosystemFeatureConfig;
+  /** 24h cron to check canonical repo for framework updates. Requires upstream git remote. */
+  upstream_sync?: EcosystemFeatureConfig;
+  /** Weekly cron to browse community catalog and surface new skills/templates to user. */
+  catalog_browse?: EcosystemFeatureConfig;
+  /** On-demand workflow to publish custom skills/templates to the community catalog. */
+  community_publish?: EcosystemFeatureConfig;
+}
+
 export interface AgentConfig {
   startup_delay?: number;
   max_session_seconds?: number;
@@ -132,12 +147,15 @@ export interface AgentConfig {
     always_ask: string[];
     never_ask: string[];
   };
+  ecosystem?: EcosystemConfig;
 }
 
 export interface CronEntry {
   name: string;
   /** For recurring crons: how often to fire (e.g. "4h", "1d"). */
   interval?: string;
+  /** For time-anchored crons: a cron expression (e.g. "0 8 * * *"). Takes precedence over interval. */
+  cron?: string;
   /** For one-shot crons: ISO 8601 datetime when the cron should fire. */
   fire_at?: string;
   prompt: string;

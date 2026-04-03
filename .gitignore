@@ -10,6 +10,9 @@ dist/
 
 # User-created org data (not part of the framework)
 orgs/
+# But community subdirectories ARE part of the framework
+!community/
+!community/**
 
 # Secrets
 .env

@@ -67,14 +67,30 @@ export interface ExperimentCycle {
   name: string;
   agent: string;
   metric: string;
+  metric_type: 'quantitative' | 'qualitative';
   surface: string;
   direction: 'higher' | 'lower';
   window: string;
+  measurement: string;
+  loop_interval: string;
+  enabled: boolean;
+  created_by: string;
+  created_at: string;
 }
 
 export interface ExperimentConfig {
   approval_required?: boolean;
   cycles?: ExperimentCycle[];
+  theta_wave?: {
+    enabled?: boolean;
+    interval?: string;
+    metric?: string;
+    metric_type?: string;
+    direction?: string;
+    auto_create_agent_cycles?: boolean;
+    auto_modify_agent_cycles?: boolean;
+  };
+  monitoring?: Record<string, unknown>;
 }
 
 // --- Helpers ---
@@ -220,8 +236,26 @@ export function evaluateExperiment(
   experiment.result_value = measuredValue;
   experiment.decision = decision;
 
-  if (options?.learning) {
-    experiment.learning = options.learning;
+  // For qualitative metrics: if score is provided, use it as the measured value
+  // (agent passes 0 as placeholder measuredValue and --score 7 as the actual value)
+  if (options?.score !== undefined) {
+    measuredValue = options.score;
+    // Re-evaluate decision with the correct measured value
+    if (experiment.direction === 'higher') {
+      decision = measuredValue > experiment.baseline_value ? 'keep' : 'discard';
+    } else {
+      decision = measuredValue < experiment.baseline_value ? 'keep' : 'discard';
+    }
+    experiment.result_value = measuredValue;
+    experiment.decision = decision;
+  }
+
+  // Build learning from options
+  const learningParts: string[] = [];
+  if (options?.learning) learningParts.push(options.learning);
+  if (options?.justification) learningParts.push(options.justification);
+  if (learningParts.length > 0) {
+    experiment.learning = learningParts.join(' — ');
   }
 
   // If keep, baseline becomes the measured value
@@ -381,9 +415,13 @@ export function manageCycle(
     agent?: string;
     name?: string;
     metric?: string;
+    metric_type?: 'quantitative' | 'qualitative';
     surface?: string;
     direction?: 'higher' | 'lower';
     window?: string;
+    measurement?: string;
+    loop_interval?: string;
+    enabled?: boolean;
   },
 ): ExperimentCycle[] {
   const config = loadConfig(agentDir);
@@ -400,9 +438,15 @@ export function manageCycle(
         name: options.name,
         agent: options.agent,
         metric: options.metric,
+        metric_type: options.metric_type || 'qualitative',
         surface: options.surface || '',
         direction: options.direction || 'higher',
         window: options.window || '24h',
+        measurement: options.measurement || '',
+        loop_interval: options.loop_interval || options.window || '24h',
+        enabled: true,
+        created_by: options.agent,
+        created_at: nowISO(),
       };
       config.cycles.push(cycle);
       saveConfig(agentDir, config);
@@ -418,9 +462,13 @@ export function manageCycle(
         throw new Error(`Cycle '${options.name}' not found`);
       }
       if (options.metric) config.cycles[idx].metric = options.metric;
+      if (options.metric_type) config.cycles[idx].metric_type = options.metric_type;
       if (options.surface) config.cycles[idx].surface = options.surface;
       if (options.direction) config.cycles[idx].direction = options.direction;
+      if (options.enabled !== undefined) config.cycles[idx].enabled = options.enabled;
       if (options.window) config.cycles[idx].window = options.window;
+      if (options.measurement) config.cycles[idx].measurement = options.measurement;
+      if (options.loop_interval) config.cycles[idx].loop_interval = options.loop_interval;
       if (options.agent) config.cycles[idx].agent = options.agent;
       saveConfig(agentDir, config);
       return config.cycles;

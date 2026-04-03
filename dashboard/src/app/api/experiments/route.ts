@@ -21,6 +21,7 @@ interface Experiment {
   baseline_value: number;
   result_value: number | null;
   decision: string | null;
+  changes_description?: string | null;
   learning: string | null;
   experiment_commit: string | null;
   tracking_commit: string | null;
@@ -31,6 +32,7 @@ interface Experiment {
 
 interface Cycle {
   name: string;
+  agent: string;
   surface: string;
   metric: string;
   metric_type: string;

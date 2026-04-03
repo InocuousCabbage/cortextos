@@ -312,7 +312,7 @@ cat "$HOME/.cortextos/default/state/$AGENT/heartbeat.json"
 
 ### List All Agents
 ```bash
-cortextos list-agents --format json
+cortextos bus list-agents --format json
 ```
 
 ### Check PM2 Process Status
@@ -383,7 +383,7 @@ cortextos enable "$AGENT" --org "$ORG" --restart
 | Update bot token | Edit .env BOT_TOKEN + soft restart |
 | Add cron | Edit config.json crons + notify agent |
 | Check health | `cortextos status` or `cortextos bus read-all-heartbeats` |
-| List agents | `cortextos list-agents --format json` |
+| List agents | `cortextos bus list-agents --format json` |
 | Check PM2 | `pm2 list` |
 | Reset crash count | `rm ~/.cortextos/default/state/<agent>/.crash_count_today` |
 | Force fresh start | Write .force-fresh + `cortextos enable --restart` |

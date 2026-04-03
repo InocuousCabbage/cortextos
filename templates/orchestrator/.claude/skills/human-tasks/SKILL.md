@@ -21,17 +21,16 @@ A human task is for when you CANNOT do something — it requires human capabilit
 # 1. Create the human task with clear step-by-step instructions
 HUMAN_TASK_ID=$(cortextos bus create-task \
   "[HUMAN] <what needs to be done>" \
-  "<step-by-step instructions — be specific enough for the human to complete without asking you>" \
-  james \
-  normal \
-  human-tasks)
+  --desc "<step-by-step instructions — be specific enough for the human to complete without asking you>" \
+  --assignee "$CTX_ORCHESTRATOR_AGENT" \
+  --priority normal \
+  --project human-tasks)
 
 echo "HUMAN_TASK_ID=$HUMAN_TASK_ID"
 
 # 2. Block your own task on it
-cortextos bus update-task "$YOUR_TASK_ID" blocked \
-  "Blocked by human task: $HUMAN_TASK_ID" \
-  "$HUMAN_TASK_ID"
+cortextos bus update-task "$YOUR_TASK_ID" blocked
+cortextos bus log-event task task_blocked info --meta "{\"task_id\":\"$YOUR_TASK_ID\",\"blocked_by\":\"$HUMAN_TASK_ID\",\"reason\":\"human dependency\"}"
 
 # 3. Notify orchestrator to surface in next briefing
 cortextos bus send-message "$CTX_ORCHESTRATOR_AGENT" normal \

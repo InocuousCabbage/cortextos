@@ -20,8 +20,8 @@ If `ONBOARDED`: continue with the session start protocol below.
 1. Read all bootstrap files: IDENTITY.md, SOUL.md, GUARDRAILS.md, GOALS.md, MEMORY.md, USER.md, SYSTEM.md
 2. Read org knowledge base: `../../knowledge.md` (shared facts all agents need)
 3. Discover available skills: `cortextos bus list-skills --format text`
-4. Discover active agents: `cortextos list-agents` (live roster from enabled-agents.json)
-5. Read `config.json` and set up crons via `/loop` (check CronList first - no duplicates)
+4. Discover active agents: `cortextos bus list-agents` (live roster from enabled-agents.json)
+5. Restore crons from `config.json` — run CronList first (no duplicates). For each entry: if it has a `"cron"` field, use CronCreate directly with `{cron: entry.cron, prompt: entry.prompt, recurring: true}`; if `type: "recurring"` (or no type) with an `"interval"` field, call `/loop {interval} {prompt}`; if `type: "once"`, check `fire_at` — recreate via CronCreate if still in the future, or delete from config.json if expired.
 6. Check today's memory file (`memory/YYYY-MM-DD.md`) for any in-progress work
 7. Check inbox for pending messages
 8. **Goals check**: Read `goals.json` — if `focus` and `goals` are both empty, message your orchestrator: "I'm online but have no goals set. Can you send me today's goals?" Then read GOALS.md for any pre-set goals.
@@ -107,11 +107,15 @@ Always include `msg_id` as reply_to (auto-ACKs the original). Un-ACK'd messages 
 
 Defined in `config.json` under `crons` array. Set up once per session via `/loop`.
 
-**Add:** Create `/loop {interval} {prompt}`, then add to `config.json`
-**Remove:** Cancel the `/loop`, remove from `config.json`
-**Format:** `{"name": "...", "interval": "5m", "prompt": "..."}`
+**Recurring:** `{"name": "...", "type": "recurring", "interval": "4h", "prompt": "..."}`
+**One-shot:** `{"name": "...", "type": "once", "fire_at": "2026-04-02T15:00:00Z", "prompt": "..."}`
 
-Crons expire after 3 days but are recreated from config on each restart.
+**Add recurring:** Write entry to config.json, then `/loop {interval} {prompt}`
+**Add one-shot:** Write entry to config.json, then CronCreate with `recurring: false`
+**Remove:** CronDelete, then remove entry from config.json
+**After one-shot fires:** Delete its entry from config.json
+
+Crons expire after 7 days. They are recreated from config.json on each session start — but only if you actively recreate them.
 
 ---
 
@@ -189,7 +193,7 @@ When you find something relevant: surface ONE suggestion at a time via Telegram.
 
 ## Community Publishing
 
-If `ecosystem.publishing.enabled` is true in your config.json, periodically check for custom skills running successfully 2+ weeks. If user agrees to share:
+If `ecosystem.community_publish.enabled` is true in your config.json, periodically check for custom skills running successfully 2+ weeks. If user agrees to share:
 
 ```bash
 cortextos bus prepare-submission <type> <source-path> <item-name>
@@ -210,8 +214,8 @@ cortextos bus submit-community-item <name> <type> "<description>"
    ```
 3. Create the agent:
    ```bash
-   cp -r $CTX_FRAMEWORK_ROOT/templates/agent $CTX_PROJECT_ROOT/agents/<name>
-   cat > $CTX_PROJECT_ROOT/agents/<name>/.env << EOF
+   cp -r $CTX_FRAMEWORK_ROOT/templates/agent $CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/agents/<name>
+   cat > $CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/agents/<name>/.env << EOF
    BOT_TOKEN=<token>
    CHAT_ID=<chat_id>
    EOF
@@ -246,10 +250,10 @@ cortextos bus submit-community-item <name> <type> "<description>"
 ### Logs
 | Log | Path |
 |-----|------|
-| Activity | `~/.cortextos/$CTX_INSTANCE/logs/$CTX_AGENT_NAME/activity.log` |
-| Fast-checker | `~/.cortextos/$CTX_INSTANCE/logs/$CTX_AGENT_NAME/fast-checker.log` |
-| Stdout | `~/.cortextos/$CTX_INSTANCE/logs/$CTX_AGENT_NAME/stdout.log` |
-| Stderr | `~/.cortextos/$CTX_INSTANCE/logs/$CTX_AGENT_NAME/stderr.log` |
+| Activity | `~/.cortextos/$CTX_INSTANCE_ID/logs/$CTX_AGENT_NAME/activity.log` |
+| Fast-checker | `~/.cortextos/$CTX_INSTANCE_ID/logs/$CTX_AGENT_NAME/fast-checker.log` |
+| Stdout | `~/.cortextos/$CTX_INSTANCE_ID/logs/$CTX_AGENT_NAME/stdout.log` |
+| Stderr | `~/.cortextos/$CTX_INSTANCE_ID/logs/$CTX_AGENT_NAME/stderr.log` |
 
 ### State
 | File | Purpose |
@@ -272,14 +276,14 @@ cortextos bus submit-community-item <name> <type> "<description>"
 ### Nightly Metrics Collection
 Run the metrics collector on your nightly cron:
 ```bash
-cortextos collect-metrics
+cortextos bus collect-metrics
 ```
-Review the output at `~/.cortextos/$CTX_INSTANCE/analytics/reports/latest.json` and report anomalies to orchestrator.
+Review the output at `~/.cortextos/$CTX_INSTANCE_ID/analytics/reports/latest.json` and report anomalies to orchestrator.
 
 ### Health Monitoring
 Every heartbeat cycle, check system health:
 ```bash
-cortextos bus read-all-heartbeats --brief
+cortextos bus read-all-heartbeats --format text
 ```
 
 **Alert orchestrator if:**
@@ -296,7 +300,7 @@ cortextos status
 ### Event Log Analysis
 Check for error patterns in event logs:
 ```bash
-cat ~/.cortextos/$CTX_INSTANCE/analytics/events/$CTX_AGENT_NAME/$(date -u +%Y-%m-%d).jsonl | jq 'select(.category == "error")'
+cat ~/.cortextos/$CTX_INSTANCE_ID/analytics/events/$CTX_AGENT_NAME/$(date -u +%Y-%m-%d).jsonl | jq 'select(.category == "error")'
 ```
 
 ---

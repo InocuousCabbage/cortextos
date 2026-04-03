@@ -17,7 +17,7 @@ You have research cycles assigned to you (check `experiments/config.json`). Each
 - A **measurement window** (how long to wait before measuring)
 - A **measurement method** (how to get the metric value)
 
-You CANNOT modify your own cycle configuration. Only the analyst (via theta wave) can create, modify, or remove your cycles. You CAN and SHOULD run experiments within your assigned cycles.
+You cannot autonomously modify your own cycle configuration. If the user asks you to modify a cycle, you can. Otherwise, the analyst (via theta wave) is the one who creates, modifies, or removes cycles. You CAN and SHOULD run experiments within your assigned cycles.
 
 ## The Experiment Loop
 
@@ -57,7 +57,12 @@ Based on accumulated learnings:
 ```bash
 cortextos bus create-experiment "<metric_name>" "<your hypothesis>" --surface <path> --direction <higher|lower> --window <duration>
 ```
-If `approval_required` is true in your config, an approval will be created. Wait for approval before proceeding.
+If `approval_required` is true in `experiments/config.json`, you must manually create an approval before proceeding:
+```bash
+APPR_ID=$(cortextos bus create-approval "Run experiment: <hypothesis>" experiments "Cycle: <cycle_name>, Metric: <metric_name>, Surface: <surface>")
+cortextos bus send-telegram $CTX_TELEGRAM_CHAT_ID "Approval needed to run experiment for <metric_name> — check dashboard"
+# Block until approved, then continue to Step 5
+```
 
 ### Step 5: Make Changes and Run
 Apply your hypothesized changes to the surface file. Then:
@@ -95,9 +100,64 @@ cortextos bus evaluate-experiment <id> 0 --score 7 --justification "Output is mo
 ### Qualitative (comparative)
 You compare baseline vs experiment output side by side and score 1-10.
 
+## Setting Up a Cycle (Orchestrator-Specific)
+
+Orchestrator-appropriate metrics to suggest to the user:
+- **briefing_quality** — qualitative score 1-10 on how useful morning/evening briefings are (surface: SOUL.md or a briefing prompt file)
+- **approval_routing_speed** — quantitative: minutes from approval created to user Telegram notification (computed from event log timestamps)
+- **goal_cascade_alignment** — qualitative score 1-10 on how well agents' tasks match the north star (surface: goal-management skill or SOUL.md)
+
+If the user wants to set up a cycle, collect these 8 things:
+1. **Metric** — which of the above (or their own choice)
+2. **Metric type** — quantitative (scripted/computed) or qualitative (you score 1-10 each cycle)
+3. **Surface** — the file to experiment on
+4. **Direction** — higher or lower is better (usually higher)
+5. **Measurement** — how to get the metric value (for briefing quality: self-score 1-10; for approval routing: compute timestamp delta from event log)
+6. **Window** — how long to wait before measuring (e.g., `72h` for briefing quality — needs a few days of data)
+7. **Loop interval** — how often to run the experiment loop (often same as window)
+8. **Approval** — should each experiment need your approval before running?
+
+Then create the cycle and surface directory:
+```bash
+mkdir -p "experiments/surfaces/<metric>"
+cat > "experiments/surfaces/<metric>/current.md" << 'EOF'
+# <metric> — Baseline
+
+[Describe the current approach being tested]
+EOF
+
+cortextos bus manage-cycle create $CTX_AGENT_NAME \
+  --cycle "<metric_name>" \
+  --metric "<metric_name>" \
+  --metric-type "<quantitative|qualitative>" \
+  --surface "experiments/surfaces/<metric>/current.md" \
+  --direction "<higher|lower>" \
+  --window "<e.g. 72h>" \
+  --measurement "<how to measure>" \
+  --loop-interval "<e.g. 72h>"
+```
+
+Then set up the cron immediately (this is a Claude command, not a bash command — run it directly):
+
+`/loop <loop_interval> Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop.`
+
+Then add to `config.json` crons array:
+```json
+{"name": "experiment-<metric>", "interval": "<loop_interval>", "prompt": "Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop."}
+```
+
+To modify a cycle when the user asks:
+```bash
+cortextos bus manage-cycle modify $CTX_AGENT_NAME --cycle "<name>" \
+  --window "<new>" \
+  --loop-interval "<new>" \
+  --enabled <true|false>
+```
+Use `--enabled false` to pause a cycle without deleting it.
+
 ## Important Rules
 
-1. You CANNOT modify your own cycle config (surfaces, metrics, timing). Only theta wave can.
+1. Never autonomously modify your own cycle config. If the user asks you to, you can.
 2. You MUST log learnings for EVERY experiment, including failures. Negative learnings are equally valuable.
 3. You MUST respect the measurement window - do not evaluate early.
 4. If approval_required is true, WAIT for approval before running.

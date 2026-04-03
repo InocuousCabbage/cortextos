@@ -18,7 +18,7 @@ cortextos bus log-event <category> <event_name> <severity> [--meta '<json>']
 
 | Parameter | Options |
 |-----------|---------|
-| category | `heartbeat` `task` `comms` `error` `system` `work` `action` |
+| category | `action` `task` `heartbeat` `message` `approval` `error` `metric` `milestone` |
 | severity | `info` `warning` `error` `critical` |
 
 ---
@@ -55,13 +55,13 @@ cortextos bus log-event heartbeat agent_heartbeat info \
 
 ### Research completed
 ```bash
-cortextos bus log-event work research_complete info \
+cortextos bus log-event action research_complete info \
   --meta "{\"topic\":\"<topic>\",\"findings\":3,\"agent\":\"$CTX_AGENT_NAME\"}"
 ```
 
 ### Message dispatched to agent
 ```bash
-cortextos bus log-event comms message_sent info \
+cortextos bus log-event message message_sent info \
   --meta "{\"to\":\"<agent>\",\"priority\":\"normal\",\"agent\":\"$CTX_AGENT_NAME\"}"
 ```
 

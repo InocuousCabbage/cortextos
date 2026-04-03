@@ -17,7 +17,7 @@ You have research cycles assigned to you (check `experiments/config.json`). Each
 - A **measurement window** (how long to wait before measuring)
 - A **measurement method** (how to get the metric value)
 
-You CANNOT modify your own cycle configuration. Only the analyst (via theta wave) can create, modify, or remove your cycles. You CAN and SHOULD run experiments within your assigned cycles.
+You cannot autonomously modify your own cycle configuration. If the user asks you to modify a cycle, you can. Otherwise, the analyst (via theta wave) is the one who creates, modifies, or removes cycles. You CAN and SHOULD run experiments within your assigned cycles.
 
 ## The Experiment Loop
 
@@ -57,7 +57,12 @@ Based on accumulated learnings:
 ```bash
 cortextos bus create-experiment "<metric_name>" "<your hypothesis>" --surface <path> --direction <higher|lower> --window <duration>
 ```
-If `approval_required` is true in your config, an approval will be created. Wait for approval before proceeding.
+If `approval_required` is true in `experiments/config.json`, you must manually create an approval before proceeding:
+```bash
+APPR_ID=$(cortextos bus create-approval "Run experiment: <hypothesis>" experiments "Cycle: <cycle_name>, Metric: <metric_name>, Surface: <surface>")
+cortextos bus send-telegram $CTX_TELEGRAM_CHAT_ID "Approval needed to run experiment for <metric_name> — check dashboard"
+# Block until approved, then continue to Step 5
+```
 
 ### Step 5: Make Changes and Run
 Apply your hypothesized changes to the surface file. Then:
@@ -95,9 +100,64 @@ cortextos bus evaluate-experiment <id> 0 --score 7 --justification "Output is mo
 ### Qualitative (comparative)
 You compare baseline vs experiment output side by side and score 1-10.
 
+## Setting Up a Cycle
+
+If the user asks you to set up autoresearch, collect these 8 things:
+1. **Metric** — what to optimize (e.g., "engagement_rate", "task_completion_rate", "briefing_quality")
+2. **Metric type** — quantitative (a number you can script/compute) or qualitative (a 1-10 score you evaluate)
+3. **Surface** — the file to experiment on (e.g., `experiments/surfaces/engagement/current.md` for a prompt, or `SOUL.md` for behavior)
+4. **Direction** — higher or lower is better
+5. **Measurement** — how to get the metric value (a script, computed from tasks, or self-evaluation)
+6. **Window** — how long to wait before measuring the result (e.g., `24h`, `48h`)
+7. **Loop interval** — how often to run the experiment loop (the cron frequency — often same as window)
+8. **Approval** — should you need approval before running each experiment?
+
+Then create the cycle and surface directory:
+```bash
+# Create surface directory and baseline file
+mkdir -p "experiments/surfaces/<metric>"
+cat > "experiments/surfaces/<metric>/current.md" << 'EOF'
+# <metric> — Baseline
+
+[Describe the current approach being tested]
+EOF
+
+# Register the cycle
+cortextos bus manage-cycle create $CTX_AGENT_NAME \
+  --cycle "<metric_name>" \
+  --metric "<metric_name>" \
+  --metric-type "<quantitative|qualitative>" \
+  --surface "experiments/surfaces/<metric>/current.md" \
+  --direction "<higher|lower>" \
+  --window "<e.g. 24h>" \
+  --measurement "<how to measure>" \
+  --loop-interval "<e.g. 48h>"
+
+# Update approval setting in config if needed (default is true)
+# Only set to false if user explicitly says no approval needed
+```
+
+Then set up the cron immediately (this is a Claude command, not a bash command — run it directly):
+
+`/loop <loop_interval> Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop.`
+
+Then add to `config.json` crons array:
+```json
+{"name": "experiment-<metric>", "interval": "<loop_interval>", "prompt": "Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop."}
+```
+
+To modify a cycle when the user asks:
+```bash
+cortextos bus manage-cycle modify $CTX_AGENT_NAME --cycle "<name>" \
+  --window "<new>" \
+  --loop-interval "<new>" \
+  --enabled <true|false>
+```
+Use `--enabled false` to pause a cycle without deleting it.
+
 ## Important Rules
 
-1. You CANNOT modify your own cycle config (surfaces, metrics, timing). Only theta wave can.
+1. Never autonomously modify your own cycle config. If the user asks you to, you can.
 2. You MUST log learnings for EVERY experiment, including failures. Negative learnings are equally valuable.
 3. You MUST respect the measurement window - do not evaluate early.
 4. If approval_required is true, WAIT for approval before running.

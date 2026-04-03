@@ -94,13 +94,32 @@ Based on the conversation, decide what to change:
 
 **Create new cycles for agents:**
 ```bash
-cortextos bus manage-cycle create <agent> --metric <name> --surface <path> --direction <dir> --window <dur>
+cortextos bus manage-cycle create <agent> \
+  --cycle <cycle_name> \
+  --metric <metric_name> \
+  --metric-type <quantitative|qualitative> \
+  --surface <path_to_surface_file> \
+  --direction <higher|lower> \
+  --window <measurement_window> \
+  --measurement "<how_to_measure>" \
+  --loop-interval <cron_frequency>
+```
+Then send the agent a message to set up the corresponding cron:
+```bash
+cortextos bus send-message <agent> normal "New autoresearch cycle created: <cycle_name> optimizing <metric_name>. Set up the cron: /loop <loop_interval> Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop. Add to config.json crons."
 ```
 
 **Modify existing cycles:**
 ```bash
-cortextos bus manage-cycle modify <agent> --cycle <name> --window <new_window>
+cortextos bus manage-cycle modify <agent> --cycle <name> \
+  --window <new_window> \
+  --loop-interval <new_loop_interval> \
+  --surface <new_surface> \
+  --measurement "<new_method>" \
+  --metric-type <quantitative|qualitative> \
+  --enabled <true|false>
 ```
+Use `--enabled false` to pause a stale or converged cycle instead of removing it entirely — pausing preserves the cycle history.
 
 **Remove converged or irrelevant cycles:**
 ```bash

@@ -7,6 +7,7 @@
 
 import { existsSync, readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, cpSync, rmSync } from 'fs';
 import { join, resolve, relative } from 'path';
+import { execSync } from 'child_process';
 import { ensureDir } from '../utils/atomic.js';
 
 // --- Types ---
@@ -403,7 +404,7 @@ export function submitCommunityItem(
   itemName: string,
   itemType: string,
   description: string,
-  options: { dryRun?: boolean; author?: string } = {},
+  options: { dryRun?: boolean; author?: string; contribute?: boolean } = {},
 ): SubmitResult {
   if (!itemName || !itemType || !description) {
     return { status: 'error', name: itemName || '', error: 'usage: submit-community-item <item-name> <item-type> <description>' };
@@ -479,15 +480,104 @@ export function submitCommunityItem(
   // Clean up staging
   rmSync(stagingDir, { recursive: true, force: true });
 
+  // --contribute: create branch, commit, push to origin, open PR against upstream
+  if (options.contribute) {
+    const execOpts = { cwd: frameworkRoot, encoding: 'utf-8' as const, timeout: 60000 };
+
+    try {
+      // Verify upstream remote exists
+      let upstreamUrl: string;
+      try {
+        upstreamUrl = (execSync('git remote get-url upstream', { ...execOpts, stdio: 'pipe' }) as string).trim();
+      } catch {
+        return {
+          status: 'error', name: itemName,
+          error: 'no upstream remote configured',
+          hint: 'Run: git remote add upstream <canonical-repo-url>',
+        };
+      }
+
+      // Verify origin remote exists
+      try {
+        execSync('git remote get-url origin', { ...execOpts, stdio: 'pipe' });
+      } catch {
+        return {
+          status: 'error', name: itemName,
+          error: 'no origin remote configured',
+          hint: 'Add your fork as origin: git remote add origin <your-fork-url>',
+        };
+      }
+
+      // Create and switch to contribution branch (from current HEAD)
+      try {
+        execSync(`git checkout -b ${branch}`, { ...execOpts, stdio: 'pipe' });
+      } catch {
+        // Branch may already exist — switch to it
+        execSync(`git checkout ${branch}`, { ...execOpts, stdio: 'pipe' });
+      }
+
+      // Stage the new community files and updated catalog
+      execSync('git add community/', { ...execOpts, stdio: 'pipe' });
+
+      // Commit
+      const commitMsg = `community: add ${itemType} ${itemName}\n\n${description}\n\nSubmitted-by: ${author}`;
+      execSync(`git commit -m ${JSON.stringify(commitMsg)}`, { ...execOpts, stdio: 'pipe' });
+
+      // Push to origin
+      execSync(`git push origin ${branch}`, { ...execOpts, stdio: 'pipe' });
+
+      // Extract upstream repo (owner/repo) from upstream remote URL
+      const upstreamRepo = extractRepoPath(upstreamUrl);
+
+      // Open PR via gh CLI
+      let prUrl = '';
+      try {
+        const prTitle = `Community ${itemType}: ${itemName}`;
+        const prBody = `## ${itemName}\n\n${description}\n\n**Type:** ${itemType}\n**Author:** ${author}\n\n---\n*Submitted via cortextOS community publishing*`;
+        const ghOut = (execSync(
+          `gh pr create --repo ${upstreamRepo} --title ${JSON.stringify(prTitle)} --body ${JSON.stringify(prBody)}`,
+          { ...execOpts, stdio: 'pipe' },
+        ) as string).trim();
+        prUrl = ghOut.split('\n').find((l: string) => l.startsWith('https://')) || ghOut;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return {
+          status: 'contributed',
+          name: itemName,
+          branch,
+          file_count: files.length,
+          hint: `Branch pushed to origin/${branch} but gh pr create failed: ${msg.split('\n')[0]}. Open the PR manually.`,
+        };
+      }
+
+      return {
+        status: 'contributed',
+        name: itemName,
+        branch,
+        pr_url: prUrl,
+        file_count: files.length,
+      };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { status: 'error', name: itemName, error: `contribution failed: ${msg.split('\n')[0]}` };
+    }
+  }
+
   return {
     status: 'submitted',
     name: itemName,
-    branch,
     file_count: files.length,
   };
 }
 
 // --- Helpers ---
+
+/** Extract "owner/repo" from a git remote URL (https or ssh) */
+function extractRepoPath(remoteUrl: string): string {
+  // https://github.com/owner/repo.git  or  git@github.com:owner/repo.git
+  const match = remoteUrl.match(/[:/]([^/:]+\/[^/]+?)(?:\.git)?$/);
+  return match ? match[1] : remoteUrl;
+}
 
 function listFilesRecursive(dir: string, baseDir: string): string[] {
   const results: string[] = [];

@@ -27,11 +27,12 @@ The script fetches from upstream and returns a JSON summary categorizing changes
 ### Step 2: If updates available
 
 1. Read the JSON output to understand what changed
-2. Read the actual diff: `git diff HEAD..upstream/main`
-3. Explain EVERY change in plain English to the user via Telegram
-4. Categorize: security fix, new feature, template change, breaking change
-5. Recommend: "safe to apply" or "review needed because..."
-6. Wait for explicit "yes" from the user
+2. If `catalog_additions` array is present, note those new community items separately — surface them to user after the framework update conversation
+3. Read the actual diff: `git diff HEAD..upstream/main`
+4. Explain EVERY change in plain English to the user via Telegram
+5. Categorize: security fix, new feature, template change, breaking change
+6. Recommend: "safe to apply" or "review needed because..."
+7. Wait for explicit "yes" from the user
 
 ### Step 3: Apply (only after approval)
 
@@ -53,5 +54,6 @@ Requires `ecosystem.upstream_sync.enabled: true` in config.json.
 
 - NEVER auto-merges
 - NEVER applies without explicit user approval
+- NEVER applies during night mode — check day_mode_start/day_mode_end from config.json before proceeding
 - Always explains changes before applying
 - Warns about breaking changes or template modifications

@@ -38,7 +38,7 @@ This is your first time running. Before starting normal operations, complete thi
 
 6. **Set working hours** — check org config first, only ask if not already set:
    ```bash
-   ORG_HOURS=$(cat "${CTX_FRAMEWORK_ROOT}/orgs/${CTX_ORG}/config.json" 2>/dev/null | jq -r '.working_hours_start // empty')
+   ORG_HOURS=$(cat "${CTX_FRAMEWORK_ROOT}/orgs/${CTX_ORG}/context.json" 2>/dev/null | jq -r '.day_mode_start // empty')
    ```
    If org config has working hours, use those values. If not set, ask:
    > "What are your working hours? I'll be in active mode then and work autonomously overnight."
@@ -230,47 +230,65 @@ After workflows and tools are configured:
 ## Part 5: Autoresearch (Experiments)
 
 21. **Explain autoresearch:**
-    > "One more thing. Autoresearch is how I improve over time. I can run experiments on specific aspects of my work - testing hypotheses, measuring results, keeping what works. Think of me as a scientist iterating on my craft."
+    > "One more thing — autoresearch is how I improve over time. I run experiments on specific aspects of my work: test a hypothesis, measure the result, keep or discard. Think of me as a scientist iterating on my craft. You can see all experiments on the dashboard under Experiments."
 
 22. **Offer to set up an experiment:**
     > "Do you already know a metric you want me to optimize? For example:
-    > - If I'm a content agent: engagement rate, views, click-through
-    > - If I'm a dev agent: build reliability, code quality, deploy speed
-    > - If I'm a comms agent: response rate, inbox zero time, meeting prep quality
+    > - Content agent: engagement rate, views, click-through
+    > - Dev agent: build reliability, code quality, deploy speed
+    > - Comms agent: response rate, inbox zero time, meeting prep quality
     >
-    > If you know what to optimize, I can set up a research cycle now. Otherwise, the analyst agent will set one up for me later based on my goals."
+    > You don't need to have one ready now — you can tell me to set up autoresearch anytime. If you do have one in mind, I can configure it now."
 
-23. If user wants to set up now:
-    - Ask: (a) what metric to optimize, (b) what to experiment on - the "surface" (a file, a prompt, a workflow), (c) how to measure results, (d) how long between experiments
-    - Ask: "Should I need your approval before running each experiment, or experiment autonomously?" (approval preference - note: already covered in Part 2b for external actions, this is specifically for experiments)
-    - Write to `experiments/config.json`:
-      ```bash
-      mkdir -p experiments/surfaces/<metric>
-      cat > experiments/config.json << EOF
-      {
-        "approval_required": <true/false from their answer>,
-        "cycles": [{
-          "name": "<metric_name>",
-          "surface": "experiments/surfaces/<metric>/current.md",
-          "metric": "<metric_name>",
-          "metric_type": "quantitative",
-          "direction": "higher",
-          "window": "<e.g. 24h>",
-          "enabled": true,
-          "created_by": "user",
-          "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-        }]
-      }
-      EOF
-      ```
-    - Create `experiments/surfaces/<metric>/current.md` with a description of the current approach being tested
-    - Add experiment cron to config.json crons array:
-      ```json
-      {"name": "experiment-<metric>", "interval": "<window>", "prompt": "Read .claude/skills/autoresearch/SKILL.md. Run one experiment cycle for metric '<metric>'."}
-      ```
+23. If user wants to set up now, ask sequentially:
+    - (a) What metric to optimize?
+    - (b) What should I experiment on — the "surface"? (a prompt file, a workflow description, a behavior in SOUL.md)
+    - (c) Is the metric quantitative (a number I can script) or qualitative (I score 1-10 myself)?
+    - (d) How do I measure it? (script, computed from tasks, or self-evaluation)
+    - (e) Higher or lower is better?
+    - (f) How long to wait before measuring a result? (the measurement window, e.g. 24h, 48h)
+    - (g) How often should I run the experiment loop? (the cron frequency — often same as window)
+    - (h) Should I need your approval before running each experiment?
+
+    Then set up the cycle and cron. Read `.claude/skills/autoresearch/SKILL.md` for the full setup commands. In brief:
+    ```bash
+    # Create surface directory and baseline file
+    mkdir -p "$CTX_AGENT_DIR/experiments/surfaces/<metric>"
+    cat > "$CTX_AGENT_DIR/experiments/surfaces/<metric>/current.md" << 'EOF'
+    # <metric> Baseline
+
+    [Current approach description]
+    EOF
+
+    # Register the cycle
+    cortextos bus manage-cycle create $CTX_AGENT_NAME \
+      --cycle "<metric_name>" \
+      --metric "<metric_name>" \
+      --metric-type "<quantitative|qualitative>" \
+      --surface "experiments/surfaces/<metric>/current.md" \
+      --direction "<higher|lower>" \
+      --window "<measurement_window>" \
+      --measurement "<how_to_measure>" \
+      --loop-interval "<cron_frequency>"
+
+    ```
+
+    Then set up the experiment cron immediately (outside the bash block — execute this as a Claude command):
+
+    `/loop <cron_frequency> Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop.`
+
+    Then add to `config.json` crons array:
+    ```json
+    {"name": "experiment-<metric>", "interval": "<cron_frequency>", "prompt": "Read .claude/skills/autoresearch/SKILL.md and execute the experiment loop."}
+    ```
+
+    If user set approval_required to false, update `experiments/config.json`:
+    ```bash
+    jq '.approval_required = false' "$CTX_AGENT_DIR/experiments/config.json" > /tmp/cfg.tmp && mv /tmp/cfg.tmp "$CTX_AGENT_DIR/experiments/config.json"
+    ```
 
 24. If user does not want to set up now:
-    > "No problem. The analyst will configure experiments for me based on my goals. You can always set one up later."
+    > "No problem. You can tell me to set up autoresearch any time. The analyst will also be able to configure experiment cycles for me once they come online."
 
 ## Notes
 - Be conversational, not robotic. Match the personality the user gives you.

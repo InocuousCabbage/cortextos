@@ -17,8 +17,9 @@ Every significant piece of work must have a corresponding task. Tasks enable coo
 
 ### 1. Create (BEFORE starting work)
 ```bash
-cortextos bus create-task \
-  "<title>" "<description>" [assignee] [priority] [project]
+cortextos bus create-task "<title>" \
+  --desc "<description>" \
+  [--assignee <agent>] [--priority <p>] [--project <name>]
 ```
 
 ### 2. Mark in progress
@@ -50,7 +51,7 @@ Tasks with `needs_approval: true` create an approval item that must be reviewed 
 
 | Action | Command |
 |--------|---------|
-| Create | `cortextos bus create-task "<title>" "<desc>" [assignee] [priority] [project]` |
+| Create | `cortextos bus create-task "<title>" --desc "<desc>" [--assignee A] [--priority P] [--project N]` |
 | List | `cortextos bus list-tasks [--status S] [--agent A] [--priority P]` |
 | Update | `cortextos bus update-task <id> <status> [note]` |
 | Complete | `cortextos bus complete-task <id> "[summary]"` |
@@ -58,7 +59,7 @@ Tasks with `needs_approval: true` create an approval item that must be reviewed 
 
 **Statuses:** pending, in_progress, blocked, completed
 
-**Priorities:** high, normal, low
+**Priorities:** urgent, high, normal, low
 
 ## Best Practices
 

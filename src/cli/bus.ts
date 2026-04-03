@@ -439,20 +439,36 @@ busCommand
   .argument('<action>', 'Action: create, modify, remove, list')
   .argument('<agent>', 'Agent name')
   .option('--metric <name>', 'Metric name')
-  .option('--surface <path>', 'Surface path')
+  .option('--metric-type <type>', 'Metric type: quantitative or qualitative')
+  .option('--surface <path>', 'Surface path (file to experiment on)')
   .option('--direction <dir>', 'Direction: higher or lower')
-  .option('--window <dur>', 'Measurement window')
+  .option('--window <dur>', 'Measurement window (how long before evaluating)')
+  .option('--measurement <method>', 'How to measure the metric')
+  .option('--loop-interval <dur>', 'Cron frequency for the experiment loop')
+  .option('--enabled <bool>', 'Enable or pause the cycle (true/false)')
   .option('--cycle <name>', 'Cycle name')
-  .action((action: string, agent: string, opts: { metric?: string; surface?: string; direction?: string; window?: string; cycle?: string }) => {
+  .action((action: string, agent: string, opts: { metric?: string; metricType?: string; surface?: string; direction?: string; window?: string; measurement?: string; loopInterval?: string; enabled?: string; cycle?: string }) => {
     const env = resolveEnv();
     const agentDir = env.agentDir || process.cwd();
+    if (opts.direction && opts.direction !== 'higher' && opts.direction !== 'lower') {
+      console.error(`Invalid --direction '${opts.direction}'. Must be 'higher' or 'lower'`);
+      process.exit(1);
+    }
+    if (opts.metricType && opts.metricType !== 'quantitative' && opts.metricType !== 'qualitative') {
+      console.error(`Invalid --metric-type '${opts.metricType}'. Must be 'quantitative' or 'qualitative'`);
+      process.exit(1);
+    }
     const cycles = manageCycle(agentDir, action as 'create' | 'modify' | 'remove' | 'list', {
       agent,
       name: opts.cycle,
       metric: opts.metric,
+      metric_type: opts.metricType as 'quantitative' | 'qualitative' | undefined,
       surface: opts.surface,
       direction: opts.direction as 'higher' | 'lower',
       window: opts.window,
+      measurement: opts.measurement,
+      loop_interval: opts.loopInterval,
+      enabled: opts.enabled !== undefined ? opts.enabled === 'true' : undefined,
     });
     console.log(JSON.stringify(cycles, null, 2));
   });
@@ -511,11 +527,15 @@ busCommand
   .argument('<type>', 'Item type (skill, agent, org)')
   .argument('<description>', 'Item description')
   .option('--dry-run', 'Show what would be submitted')
-  .action((name: string, type: string, description: string, opts: { dryRun?: boolean }) => {
+  .option('--author <author>', 'Author name or handle for attribution')
+  .option('--contribute', 'Create branch, push to origin, and open a PR against upstream')
+  .action((name: string, type: string, description: string, opts: { dryRun?: boolean; author?: string; contribute?: boolean }) => {
     const env = resolveEnv();
     const frameworkRoot = env.frameworkRoot || env.projectRoot || process.cwd();
     const result = submitCommunityItem(frameworkRoot, env.ctxRoot, name, type, description, {
       dryRun: opts.dryRun,
+      author: opts.author,
+      contribute: opts.contribute,
     });
     console.log(JSON.stringify(result, null, 2));
   });

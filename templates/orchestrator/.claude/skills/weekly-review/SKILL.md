@@ -1,124 +1,55 @@
 ---
 name: weekly-review
-description: "Weekly comprehensive synthesis. Triggered Sunday 8 PM cron. Reviews week's accomplishments across all agents, metrics, goals progress, business health. Plans next week."
+description: "Weekly comprehensive synthesis. Run Sunday evening or when user requests. Reviews week's accomplishments across all agents, evaluates performance, plans next week."
+triggers: ["weekly review", "weekly check-in", "end of week", "week summary", "run weekly review", "weekly briefing"]
 ---
 
-# Weekly Review Skill
+# Weekly Review
 
-> Comprehensive Sunday check-in covering all agents' output, business metrics, goals progress, personal accountability, and orchestrator self-evaluation with creative problem-solving.
+> Comprehensive weekly check-in covering all agents' output, goals progress, orchestrator self-evaluation, and next-week planning.
 
-**Trigger:** Cron job `weekly-review` - Sunday 8 PM
-**Duration:** ~15-30 minutes interactive review with James
-**Chat ID:** 7940429114
-**Output:** Memory log, actionable insights, next week plan
-
----
-
-## When This Runs
-
-- **Cron:** Sunday 8 PM EST
-- **Manual:** James says "weekly review" or "weekly check-in"
+**When:** Sunday evening (configured in cron) or when user requests.
+**Duration:** ~15-30 minutes including user interaction.
+**Output:** Memory log, actionable insights, next week plan.
 
 ---
 
-## Data Sources
-
-| Domain | Source | Method |
-|--------|--------|--------|
-| Agent Performance | cortextOS bus | `cortextos bus read-all-heartbeats` |
-| Tasks | cortextOS task system | `cortextos bus list-tasks` |
-| Calendar | Google Calendar MCP / gogcli | `gcal_list_events` or gogcli fallback |
-| Email | Gmail MCP / gogcli | `gmail_search_messages` or gogcli fallback |
-| Goals | GOALS.md | Direct file read |
-| Memory | memory/*.md (last 7 days) | Direct file reads |
-| Skool | Browser screenshot of MRR | Manual (read-only) |
-
----
-
-## Review Flow
-
-### Phase 1: Data Aggregation (Automated)
-
-Gather the week's data from all sources:
+## Phase 1: Data Aggregation
 
 ```bash
-# 1. All agent heartbeats
+# All agent heartbeats
 cortextos bus read-all-heartbeats
 
-# 2. All tasks (completed, pending, blocked)
+# All tasks this week
 cortextos bus list-tasks
 cortextos bus list-tasks --status completed
 
-# 3. This week's memory files
+# This week's memory files (last 7 days)
 for i in 0 1 2 3 4 5 6; do
   DATE=$(date -v-${i}d +%Y-%m-%d 2>/dev/null || date -d "$i days ago" +%Y-%m-%d)
   echo "=== $DATE ==="
   cat memory/${DATE}.md 2>/dev/null || echo "(no entry)"
 done
 
-# 4. Calendar events for this week
-# Preferred: gcal_list_events MCP tool
-# Fallback:
-export GOG_ACCOUNT=grandamenium@gmail.com
-WEEK_START=$(date -v-7d +%Y-%m-%d 2>/dev/null || date -d '7 days ago' +%Y-%m-%d)
-TODAY=$(date +%Y-%m-%d)
-gog calendar events "6034843a6c1d917609322f14f361c66e11fb5ef6de0b30b9d07b06cb666bf3e7@group.calendar.google.com" \
-  --from "$WEEK_START" --to "$TODAY"
-
-# 5. Goals
+# Goals and priorities
 cat GOALS.md
+cat $CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/goals.json
 
-# 6. Check inbox for any pending messages
+# Inbox
 cortextos bus check-inbox
-```
-
-### Phase 2: Skool MRR Check (Browser)
-
-1. Open Skool in browser
-2. Navigate to community settings
-3. Screenshot the MRR display
-4. Extract MRR number
-5. **READ ONLY - Never edit anything in Skool**
-
-### Phase 3: Present Review to James
-
-Format the data into a comprehensive review (see template below).
-
-Send via chunked Telegram messages:
-```bash
-cortextos bus send-telegram 7940429114 "<message chunk>"
-```
-
-### Phase 4: Interactive Discussion
-
-Ask James:
-1. What went well this week?
-2. What was challenging?
-3. Any adjustments for next week?
-
-### Phase 5: Creative Problem-Solving
-
-Based on the weekly data, Paul should:
-1. Identify patterns/problems across all agent domains
-2. Propose **creative, actionable solutions** to long-term problems
-3. Suggest system improvements and new agent setups
-4. Note experiments to try next week
-5. Identify which agents are underutilized or need capability expansion
-
-### Phase 6: Update State
-
-1. Log to `memory/YYYY-MM-DD.md`
-2. Update MEMORY.md with persistent learnings
-3. Log event
-
-```bash
-cortextos bus log-event action briefing_sent info --meta '{"type":"weekly_review"}'
-cortextos bus update-heartbeat "weekly review complete"
 ```
 
 ---
 
-## Review Template
+## Phase 2: Present Review to User
+
+Format into a comprehensive review and send as chunked Telegram messages:
+
+```bash
+cortextos bus send-telegram $CTX_TELEGRAM_CHAT_ID "<message chunk>"
+```
+
+### Review Template
 
 ```markdown
 # Weekly Review - Week of [DATE]
@@ -127,258 +58,154 @@ cortextos bus update-heartbeat "weekly review complete"
 
 ## AGENT PERFORMANCE
 
-### Agent Summary
-
 | Agent | Status | Tasks Completed | Key Wins | Issues |
 |-------|--------|----------------|----------|--------|
-| paul | [heartbeat] | X | [coordination wins] | [gaps] |
-| sentinel | [heartbeat] | X | [optimizations] | [alerts] |
-| donna | [heartbeat/planned] | X | [email/calendar] | [gaps] |
-| boris | [heartbeat/planned] | X | [code/PRs] | [gaps] |
-| alex | [heartbeat/planned] | X | [content] | [gaps] |
-| data | [heartbeat/planned] | X | [research] | [gaps] |
+| [agent] | [heartbeat age] | X | [wins] | [gaps] |
 
-### Agent Health
-- Agents online: X/6
-- Agents needing setup: [list]
-- Coordination events logged: X
-- Messages exchanged: X
-
-### System Health (from sentinel)
-- Uptime: X%
-- Anomalies detected: X
-- Optimizations applied: X
+Fleet Health:
+- Agents online: X/N
+- Agents stale (>5h): [list]
+- Coordination events this week: X
 
 ---
 
 ## PRODUCTIVITY
 
-### Tasks Completed by Agent
+Tasks this week (all agents combined):
+- Completed: X
+- In progress: Y
+- Blocked: Z
 
-| Agent | Completed | In Progress | Blocked |
-|-------|-----------|-------------|---------|
-| paul | X | Y | Z |
-| sentinel | X | Y | Z |
-| donna | X | Y | Z |
-| boris | X | Y | Z |
-| alex | X | Y | Z |
-| data | X | Y | Z |
-| **TOTAL** | **X** | **Y** | **Z** |
-
-### Overnight Work
+Overnight work:
 - Tasks dispatched: X
 - Tasks completed: X
-- Notable deliverables: [list]
-
-### Coordination Quality
-- Tasks dispatched to right agent first time: X%
-- Avg time from request to dispatch: Xm
-- Briefings sent on time: X/X
-
----
-
-## BUSINESS
-
-### Agent Architects (Skool)
-- **MRR:** $X (+/-$Y from last week)
-- **Members:** X (+/-Y)
-- Content published: X pieces
-- Engagement posts: X
-- Key wins: [list]
-
-### CoinTally
-- Milestones: [list]
-- Customers: X
-- Key progress: [summary]
-
-### cortextOS
-- Commits: X
-- Features shipped: [list]
-- Open issues: X
 
 ---
 
 ## GOALS PROGRESS
 
-| Domain | Goal | Progress | Status |
-|--------|------|----------|--------|
-| Fitness | [goal] | [progress] | [status] |
-| Skool | [revenue target] | [current] | [status] |
-| CoinTally | [milestone] | [current] | [status] |
-| Personal | [goal] | [qualitative] | [status] |
-| cortextOS | [goal] | [progress] | [status] |
+| Goal | Progress | Status |
+|------|----------|--------|
+| [north star goal] | [qualitative progress] | [on track / behind / blocked] |
 
 ---
 
-## PAUL SELF-EVALUATION (as orchestrator)
+## ORCHESTRATOR SELF-EVALUATION
 
-**Tangible Metrics:**
-- Tasks dispatched: X
-- Briefings sent on time: X/X
-- Agent coordination messages: X
-- Approvals routed: X
-- Overnight work managed: X tasks
-- Errors/re-dos: X
-
-**Scores (1-10):**
-| Category | Score | Notes |
-|----------|-------|-------|
+| Dimension | Score (1-10) | Notes |
+|-----------|-------------|-------|
 | Usefulness | X | [why] |
 | Proactivity | X | [why] |
 | Coordination | X | [why] |
 | Communication | X | [why] |
 | Learning | X | [why] |
-| **TOTAL** | X/50 | |
+| **Total** | X/50 | |
 
-**What Went Well:**
-- [bullet list]
-
-**What Could Improve:**
-- [bullet list]
-
-**Key Learnings:**
-- [bullet list]
+What went well: [bullets]
+What to improve: [bullets]
+Key learnings: [bullets]
 
 ---
 
-## CREATIVE SOLUTIONS
+## SYSTEM IMPROVEMENT PROPOSALS
 
-Based on this week's data, here are actionable solutions to observed problems:
+Based on this week's patterns:
 
-### Problem 1: [Observed Pattern]
-**Solution:** [Creative, specific, actionable solution]
-**Implementation:** [How to do it, which agent]
-**Expected Impact:** [What changes]
+[P1] [Category]: [Name]
+- Problem observed: [specific pattern]
+- Proposed solution: [concrete action]
+- Assign to: [agent]
+- Expected impact: [what changes]
 
-### Problem 2: [Observed Pattern]
-**Solution:** [Creative, specific, actionable solution]
-**Implementation:** [How to do it, which agent]
-**Expected Impact:** [What changes]
+[P2] ...
 
-### Agent System Gaps
-**Missing capability:** [What's needed]
-**Proposed agent/skill:** [Solution]
-**Priority:** [High/Medium/Low]
+Agent gaps (capabilities needed):
+- Missing: [capability]
+- Proposed: [new skill or new agent]
 
 ---
 
 ## NEXT WEEK
 
-**Top 3 Priorities:**
-1.
-2.
-3.
+Top priorities:
+1. [priority]
+2. [priority]
+3. [priority]
 
-**Goals:**
-- Skool: [specific]
-- CoinTally: [specific]
-- cortextOS: [specific]
-- Personal: [specific]
+Agent focus next week:
+- [agent]: [priority work]
 
-**Agent Focus:**
-- sentinel: [priority work]
-- donna: [priority work or setup plan]
-- boris: [priority work or setup plan]
-- alex: [priority work or setup plan]
-- data: [priority work or setup plan]
-
-**Paul Focus:**
-- [What I'll improve/experiment with as orchestrator]
-
-**System Improvements Queued:**
-- [New scripts/skills to build]
-- [New agents to set up]
-- [Integrations to add]
+System improvements queued:
+- [improvement 1]
+- [improvement 2]
 ```
 
 ---
 
-## Delivery
+## Phase 3: Interactive Discussion
 
-Send the review as chunked Telegram messages:
-
-```bash
-# Chunk 1: Agent Performance + Productivity
-cortextos bus send-telegram 7940429114 "<chunk 1>"
-sleep 2
-
-# Chunk 2: Business + Goals
-cortextos bus send-telegram 7940429114 "<chunk 2>"
-sleep 2
-
-# Chunk 3: Self-Eval + Creative Solutions
-cortextos bus send-telegram 7940429114 "<chunk 3>"
-sleep 2
-
-# Chunk 4: Next Week Plan + Action Prompts
-cortextos bus send-telegram 7940429114 "<chunk 4>"
-```
+After sending the review, ask the user:
+1. What went well this week in your view?
+2. What was challenging or frustrating?
+3. Any changes to priorities for next week?
+4. Any new agents or capabilities needed?
 
 ---
 
-## State Updates
-
-After review:
+## Phase 4: Update State
 
 ```bash
-# 1. Log event
+# Log event
 cortextos bus log-event action briefing_sent info --meta '{"type":"weekly_review"}'
 
-# 2. Update heartbeat
+# Update heartbeat
 cortextos bus update-heartbeat "weekly review complete - next week planned"
 
-# 3. Write to daily memory
+# Write to memory
 TODAY=$(date -u +%Y-%m-%d)
 cat >> "memory/$TODAY.md" << MEMEOF
 
 ## Weekly Review - $(date -u +%H:%M:%S)
 
 ### Summary
-- Total tasks completed this week: X
-- Agents active: X/6
-- Self-eval score: X/50
+- Total tasks completed this week: X (all agents)
+- Agents active: X/N
+- Self-eval total: X/50
 - Top priorities next week: [list]
 
 ### Key Insights
 - [insight 1]
 - [insight 2]
 
-### System Improvements Proposed
+### System Improvements Queued
 - [improvement 1]
-- [improvement 2]
 MEMEOF
 
-# 4. Update MEMORY.md with persistent learnings
-# Add any new patterns, preferences, or system learnings
+# Update MEMORY.md with persistent learnings
+# Add any new patterns, preferences, or system behaviors discovered this week
 ```
 
 ---
 
-## Cron Configuration
+## Custom Metrics
 
-```json
-{
-  "name": "weekly-review",
-  "schedule": "0 20 * * 0",
-  "payload": {
-    "kind": "systemEvent",
-    "text": "Weekly Review Time!\n\nRead skills/weekly-review/SKILL.md and run the full weekly review protocol."
-  }
-}
+<!-- Added during onboarding — user-specific tracking preferences -->
+<!-- Format: add bullet points below, each with the metric name and how to measure it -->
+
+<!-- Example:
+- **Skool MRR**: screenshot from Skool community settings, extract MRR number
+- **GitHub PRs merged this week**: gh pr list --state merged --json mergedAt | count those in last 7 days
+- **Content pieces published**: count from alex agent completed tasks tagged content
+-->
+
+---
+
+## Manual Trigger
+
+```
+"Run weekly review" → read .claude/skills/weekly-review/SKILL.md and execute
 ```
 
 ---
 
-## Important Notes
-
-1. **Skool is READ-ONLY** - Never edit anything, just screenshot MRR
-2. **Be creative** - The solutions section should have genuinely novel ideas
-3. **Be honest** - Self-eval should reflect actual performance as orchestrator
-4. **Keep it actionable** - Every insight needs a concrete next step and an assigned agent
-5. **Track experiments** - Note what we try and whether it works
-6. **Identify agent gaps** - Which agents need to be set up, which need new capabilities
-7. **Cross-agent patterns** - Look for coordination improvements across the whole system
-
----
-
-*This is the single source of truth for weekly review. All instructions are here.*
+*This is the single source of truth for weekly review.*

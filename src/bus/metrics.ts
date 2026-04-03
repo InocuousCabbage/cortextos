@@ -3,8 +3,9 @@
  * Node.js equivalent of bash collect-metrics.sh, scrape-usage.sh, check-upstream.sh
  */
 
-import { existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, readdirSync, mkdirSync } from 'fs';
+import { join, basename, dirname } from 'path';
+import { execSync } from 'child_process';
 import { ensureDir } from '../utils/atomic.js';
 
 // --- Types ---
@@ -38,6 +39,13 @@ export interface UsageData {
   week_sonnet: { used_pct: number };
 }
 
+export interface CatalogAddition {
+  name: string;
+  type: string;
+  description?: string;
+  tags?: string[];
+}
+
 export interface UpstreamResult {
   status: string;
   commits?: number;
@@ -51,6 +59,7 @@ export interface UpstreamResult {
     community: string[];
     other: string[];
   };
+  catalog_additions?: CatalogAddition[];
   message?: string;
   error?: string;
   hint?: string;
@@ -264,7 +273,6 @@ export function storeUsageData(ctxRoot: string, data: UsageData): void {
   const dailyPath = join(usageDir, `${today}.jsonl`);
   const line = JSON.stringify(data) + '\n';
   try {
-    const { appendFileSync } = require('fs');
     appendFileSync(dailyPath, line, 'utf-8');
   } catch {
     writeFileSync(dailyPath, line, 'utf-8');
@@ -282,7 +290,6 @@ export function checkUpstream(
   frameworkRoot: string,
   options: { apply?: boolean } = {},
 ): UpstreamResult {
-  const { execSync } = require('child_process');
   const execOpts = { cwd: frameworkRoot, encoding: 'utf-8' as const, timeout: 30000 };
 
   // Check if it's a git repo
@@ -363,16 +370,50 @@ export function checkUpstream(
     commitLog = execSync('git log HEAD..upstream/main --oneline', { ...execOpts, stdio: 'pipe' }).trim();
   } catch { /* ignore */ }
 
+  // Detect new catalog items in upstream vs local
+  function getCatalogItems(source: 'local' | 'upstream'): CatalogAddition[] {
+    try {
+      let raw: string;
+      if (source === 'upstream') {
+        raw = execSync('git show upstream/main:community/catalog.json', { ...execOpts, stdio: 'pipe' });
+      } else {
+        const localPath = join(frameworkRoot, 'community', 'catalog.json');
+        if (!existsSync(localPath)) return [];
+        raw = readFileSync(localPath, 'utf-8');
+      }
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed.items) ? parsed.items : [];
+    } catch {
+      return [];
+    }
+  }
+
   // If --apply: merge upstream
   if (options.apply) {
+    const localItems = getCatalogItems('local');
+    const localNames = new Set(localItems.map((i: CatalogAddition) => i.name));
     try {
       execSync('git merge upstream/main --no-edit', { ...execOpts, stdio: 'pipe' });
-      return { status: 'merged', commits: commitCount, message: 'Upstream changes applied successfully' };
+      // After merge, read updated catalog and surface new items
+      const mergedItems = getCatalogItems('local');
+      const catalog_additions = mergedItems.filter((i: CatalogAddition) => !localNames.has(i.name));
+      return {
+        status: 'merged',
+        commits: commitCount,
+        message: 'Upstream changes applied successfully',
+        ...(catalog_additions.length > 0 ? { catalog_additions } : {}),
+      };
     } catch {
       try { execSync('git merge --abort', { ...execOpts, stdio: 'pipe' }); } catch { /* ignore */ }
       return { status: 'conflict', message: 'Merge conflicts detected. Resolve conversationally with user.' };
     }
   }
+
+  // Dry-run: surface new catalog items in upstream vs local
+  const localItems = getCatalogItems('local');
+  const localNames = new Set(localItems.map((i: CatalogAddition) => i.name));
+  const upstreamItems = getCatalogItems('upstream');
+  const catalog_additions = upstreamItems.filter((i: CatalogAddition) => !localNames.has(i.name));
 
   return {
     status: 'updates_available',
@@ -380,6 +421,7 @@ export function checkUpstream(
     diff_stat: diffStat,
     commit_log: commitLog,
     changes,
+    ...(catalog_additions.length > 0 ? { catalog_additions } : {}),
   };
 }
 
@@ -555,7 +597,6 @@ function parseSkillFrontmatter(filePath: string): { name?: string; description?:
 }
 
 function deriveNameFromPath(filePath: string): string {
-  const { basename, dirname } = require('path');
   const base = basename(filePath);
   if (base === 'SKILL.md') {
     return basename(dirname(filePath));

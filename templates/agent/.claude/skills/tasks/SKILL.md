@@ -56,7 +56,7 @@ Tasks with `needs_approval: true` create an approval item that must be reviewed 
 
 **Statuses:** pending, in_progress, blocked, completed
 
-**Priorities:** critical, high, normal, low
+**Priorities:** urgent, high, normal, low
 
 ## Best Practices
 

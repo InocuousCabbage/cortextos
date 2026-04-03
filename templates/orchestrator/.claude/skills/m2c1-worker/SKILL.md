@@ -276,8 +276,8 @@ cortextos bus send-message <worker-name> normal 'Source .env in your project dir
 
 Copy relevant cortextOS skills to the worker's project:
 ```bash
-# If the worker needs browser automation knowledge
-cp -r $CTX_FRAMEWORK_ROOT/templates/agent/.claude/skills/peekaboo-automation "$PROJECT_DIR/.claude/skills/"
+# If the worker needs browser automation knowledge, install via community catalog:
+cortextos bus install-community-item playwright-automation
 ```
 
 ---
@@ -364,10 +364,10 @@ cortextos bus send-message <worker-name> normal \
 ```bash
 # Log the milestone
 cortextos bus log-event milestone m2c1_complete info \
-  '{"project":"<name>","location":"<path>","tasks":<count>,"tests":<count>}'
+  --meta '{"project":"<name>","location":"<path>","tasks":<count>,"tests":<count>}'
 
 # Notify orchestrator
-cortextos bus send-message paul normal \
+cortextos bus send-message $CTX_ORCHESTRATOR_AGENT normal \
   'M2C1 build complete: <project>. Location: <path>. <summary>'
 
 # Clean up worker inbox
@@ -381,11 +381,11 @@ rm -rf "$CTX_ROOT/state/<worker-name>"
 ```bash
 # Log what happened
 cortextos bus log-event action m2c1_failed info \
-  '{"project":"<name>","phase":"<where it failed>","reason":"<why>"}'
+  --meta '{"project":"<name>","phase":"<where it failed>","reason":"<why>"}'
 
 # Keep the directory for debugging
 # Report to orchestrator
-cortextos bus send-message paul normal \
+cortextos bus send-message $CTX_ORCHESTRATOR_AGENT normal \
   'M2C1 build FAILED: <project>. Failed at phase <N>. Reason: <why>. Directory preserved at <path>.'
 ```
 

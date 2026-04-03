@@ -28,6 +28,8 @@ interface Experiment {
   agent: string;
   metric: string;
   hypothesis: string;
+  changes_description?: string | null;
+  measurement?: string;
   surface: string;
   direction: string;
   window: string;
@@ -43,8 +45,12 @@ interface Experiment {
 
 interface Cycle {
   name: string;
+  agent: string;
   surface: string;
   metric: string;
+  metric_type: string;
+  measurement: string;
+  loop_interval: string;
   direction: string;
   window: string;
   enabled: boolean;
@@ -341,19 +347,31 @@ export default function ExperimentsPage() {
                                 key={cycle.name}
                                 className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
                               >
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
                                   <span className="font-medium">{cycle.name}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {cycle.direction === 'higher' ? (
-                                      <IconTrendingUp size={12} className="inline mr-0.5" />
-                                    ) : (
-                                      <IconTrendingDown size={12} className="inline mr-0.5" />
+                                  <div className="flex flex-col min-w-0">
+                                    <div className="flex items-center gap-1">
+                                      {cycle.direction === 'higher' ? (
+                                        <IconTrendingUp size={12} className="inline shrink-0 text-muted-foreground" />
+                                      ) : (
+                                        <IconTrendingDown size={12} className="inline shrink-0 text-muted-foreground" />
+                                      )}
+                                      <span className="text-xs text-muted-foreground">{cycle.metric}</span>
+                                      {cycle.metric_type && (
+                                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
+                                          {cycle.metric_type}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {cycle.measurement && (
+                                      <span className="text-xs text-muted-foreground">{cycle.measurement}</span>
                                     )}
-                                    {cycle.metric}
-                                  </span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-muted-foreground">{cycle.window}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-xs text-muted-foreground">
+                                    {cycle.window}{cycle.loop_interval ? ` • every ${cycle.loop_interval}` : ''}
+                                  </span>
                                   <Badge variant={cycle.enabled ? 'default' : 'secondary'} className="text-[10px]">
                                     {cycle.enabled ? 'active' : 'paused'}
                                   </Badge>
@@ -386,6 +404,9 @@ export default function ExperimentsPage() {
                                       </span>
                                     </div>
                                     <p className="text-sm mt-1">{exp.hypothesis}</p>
+                                    {exp.changes_description && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">{exp.changes_description}</p>
+                                    )}
                                   </div>
                                   <div className="text-right shrink-0">
                                     <div className="text-sm font-mono tabular-nums">

@@ -60,16 +60,6 @@ Then notify the user via Telegram that you are online and ready.
 
 ---
 
-## Step 5: Remove this skill
-
-Once onboarded, this skill is no longer needed. Remove it to free context:
-
-```bash
-rm -rf ".claude/skills/onboarding"
-```
-
----
-
 ## If Onboarding Is Interrupted
 
 If a session crash or restart interrupts onboarding mid-way:

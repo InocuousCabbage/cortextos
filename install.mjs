@@ -354,9 +354,36 @@ console.log('');
 if (existsSync(INSTALL_DIR)) {
   warn(`Directory ${INSTALL_DIR} already exists`);
   if (existsSync(join(INSTALL_DIR, '.git'))) {
+    // Check and migrate remote setup if needed
+    let hasUpstream = false;
+    try {
+      run('git remote get-url upstream', { cwd: INSTALL_DIR });
+      hasUpstream = true;
+    } catch { /* no upstream remote yet */ }
+
+    if (!hasUpstream) {
+      // Check if origin points to canonical — if so, rename it to upstream
+      let originUrl = '';
+      try { originUrl = run('git remote get-url origin', { cwd: INSTALL_DIR }); } catch { /* no origin */ }
+      if (originUrl && (originUrl.includes('grandamenium/cortextos') || originUrl === REPO_URL)) {
+        log('Migrating git remotes: renaming origin → upstream...');
+        try {
+          run('git remote rename origin upstream', { cwd: INSTALL_DIR });
+          ok('Remote migrated: canonical repo is now "upstream"');
+          hasUpstream = true;
+        } catch {
+          warn('Could not rename remote — run manually: git remote rename origin upstream');
+        }
+      }
+    }
+
     log('Pulling latest changes...');
     try {
-      runVisible('git pull --ff-only', { cwd: INSTALL_DIR });
+      if (hasUpstream) {
+        runVisible('git pull upstream main --ff-only', { cwd: INSTALL_DIR });
+      } else {
+        runVisible('git pull --ff-only', { cwd: INSTALL_DIR });
+      }
     } catch {
       warn('Could not pull — continuing with existing version');
     }
@@ -367,6 +394,15 @@ if (existsSync(INSTALL_DIR)) {
   log(`Cloning cortextOS to ${INSTALL_DIR}...`);
   runVisible(`git clone ${REPO_URL} ${JSON.stringify(INSTALL_DIR)}`);
   ok('Cloned');
+
+  // Rename origin → upstream so check-upstream and upstream-sync work out of the box
+  log('Configuring git remotes...');
+  try {
+    run('git remote rename origin upstream', { cwd: INSTALL_DIR });
+    ok('"upstream" remote configured (tracks canonical cortextOS)');
+  } catch {
+    warn('Could not configure upstream remote — run manually: git remote rename origin upstream');
+  }
 }
 
 // ─── 8. npm install ───────────────────────────────────────────────────────────
@@ -467,4 +503,18 @@ console.log(`     ${Y}/onboarding${R}`);
 console.log('');
 console.log('  That\'s it. The /onboarding command walks you through everything:');
 console.log('  org setup, agent creation, Telegram bots, dashboard, and more.');
+console.log('');
+console.log(`${BOLD}  Optional: Save your customizations to GitHub${R}`);
+console.log('  Create a new empty repository on GitHub (not a fork — just a blank repo).');
+console.log('  Then connect it as your "origin":');
+if (IS_WINDOWS) {
+  console.log(`     ${Y}cd "${INSTALL_DIR}" && git remote add origin <your-repo-url> && git push -u origin main${R}`);
+} else {
+  console.log(`     ${Y}cd ${INSTALL_DIR} && git remote add origin <your-repo-url> && git push -u origin main${R}`);
+}
+console.log('');
+console.log('  This lets your analyst agent:');
+console.log('  - Back up your agent customizations to your own private GitHub repo');
+console.log('  - Check for cortextOS framework updates from upstream (already configured)');
+console.log('  - Contribute custom skills back to the community catalog');
 console.log('');

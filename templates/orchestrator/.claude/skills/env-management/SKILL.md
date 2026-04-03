@@ -11,7 +11,7 @@ cortextOS uses a 4-layer env hierarchy. Later layers override earlier ones:
 ```
 1. Base shell (PATH, HOME, etc.)
 2. CTX_* vars (set by agent-pty at session start)
-3. orgs/{org}/.env  ← shared secrets, all agents in the org
+3. orgs/{org}/secrets.env  ← shared secrets, all agents in the org
 4. orgs/{org}/agents/{agent}/.env  ← agent-specific secrets
 ```
 
@@ -21,11 +21,11 @@ cortextOS uses a 4-layer env hierarchy. Later layers override earlier ones:
 
 | Key type | File | Example |
 |----------|------|---------|
-| Shared API keys (multiple agents use) | `orgs/{org}/.env` | `OPENAI_API_KEY`, `APIFY_TOKEN` |
+| Shared API keys (multiple agents use) | `orgs/{org}/secrets.env` | `OPENAI_API_KEY`, `APIFY_TOKEN`, `GEMINI_API_KEY` |
 | Agent Telegram credentials | `agents/{agent}/.env` | `BOT_TOKEN`, `CHAT_ID`, `ALLOWED_USER` |
 | Agent OAuth tokens | `agents/{agent}/.env` | `CLAUDE_CODE_OAUTH_TOKEN` |
 
-**Rule:** If more than one agent uses a key, it belongs in the org `.env`. If only one agent uses it, it belongs in that agent's `.env`.
+**Rule:** If more than one agent uses a key, it belongs in `orgs/{org}/secrets.env`. If only one agent uses it, it belongs in that agent's `.env`.
 
 `ANTHROPIC_API_KEY` is inherited from the shell that launched the daemon — never stored in any file.
 
@@ -35,15 +35,17 @@ cortextOS uses a 4-layer env hierarchy. Later layers override earlier ones:
 
 ```bash
 # 1. Locate the org .env
-ORG_ENV="$CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/.env"
+ORG_ENV="$CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/secrets.env"
 
 # 2. Append the new key (never overwrite existing)
 echo 'NEW_KEY=value' >> "$ORG_ENV"
 chmod 600 "$ORG_ENV"
 
 # 3. Restart all running agents so they pick it up
-cortextos list-agents --format json | jq -r '.[].name' | while read agent; do
-  cortextos bus hard-restart --agent "$agent" --reason "new shared secret added: NEW_KEY"
+cortextos bus list-agents --format json | jq -r '.[].name' | while read agent; do
+  echo "Restarting $agent..."
+  cortextos bus send-message "$agent" high "hard-restart" "new shared secret added: NEW_KEY"
+  sleep 10
 done
 ```
 
@@ -88,7 +90,7 @@ A key update without restarting the agent does nothing — the old value stays i
 
 ```
 Is this a shared org-level key (OPENAI_API_KEY, APIFY_TOKEN, etc.)?
-  → Update orgs/{org}/.env → hard-restart ALL agents
+  → Update orgs/{org}/secrets.env → hard-restart ALL agents
 
 Is this an agent-specific key (BOT_TOKEN, CHAT_ID, OAuth token)?
   → Update agents/{agent}/.env → hard-restart THAT AGENT ONLY
@@ -101,11 +103,11 @@ Is this ANTHROPIC_API_KEY?
 ### Rotating a Shared Org Secret
 
 ```bash
-ORG_ENV="$CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/.env"
+ORG_ENV="$CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/secrets.env"
 # Update the value in the file (edit KEY_NAME line)
 
 # Restart all agents in sequence (stagger to avoid gaps)
-cortextos list-agents --format json | jq -r '.[].name' | while read agent; do
+cortextos bus list-agents --format json | jq -r '.[].name' | while read agent; do
   echo "Restarting $agent..."
   cortextos bus send-message "$agent" high "hard-restart" "secret rotation: KEY_NAME"
   sleep 30

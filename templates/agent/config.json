@@ -13,5 +13,8 @@
       "interval": "4h",
       "prompt": "Read HEARTBEAT.md and follow its instructions. Update your heartbeat, check inbox, and work on your highest priority task."
     }
-  ]
+  ],
+  "ecosystem": {
+    "local_version_control": { "enabled": true }
+  }
 }

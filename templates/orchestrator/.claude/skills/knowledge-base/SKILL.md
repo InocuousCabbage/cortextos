@@ -55,15 +55,15 @@ cortextos bus kb-collections --org $CTX_ORG
 
 ---
 
-## First-Time Setup
+## Checking Available Collections
 
-If the knowledge base hasn't been initialized for this org:
+List all KB collections for the org:
 
 ```bash
-cortextos bus kb-setup --org $CTX_ORG
+cortextos bus kb-collections --org $CTX_ORG
 ```
 
-Run this once per org. Check collections list first — don't re-initialize if already set up.
+If no collections appear, the KB may not be configured yet — check that `GEMINI_API_KEY` is set in `orgs/$CTX_ORG/secrets.env`.
 
 ---
 

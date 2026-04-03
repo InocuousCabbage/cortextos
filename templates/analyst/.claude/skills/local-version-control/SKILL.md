@@ -26,7 +26,7 @@ This stages files with safety checks:
 - Blocks .env files and credentials
 - Blocks files over 10MB
 - Blocks binary/temp files
-- Applies .gitignore.template rules
+- Respects .gitignore rules
 
 ### Step 2: Review the staged diff
 

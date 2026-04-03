@@ -40,7 +40,7 @@ cortextos bus create-task "<title>" --desc "<description>" [--assignee <agent>] 
 - **title** (required): Short task name
 - **--desc** (optional): What needs to be done - be specific
 - **--assignee** (optional): Agent name. Defaults to $CTX_AGENT_NAME
-- **--priority** (optional): `critical` | `high` | `normal` | `low`. Defaults to `normal`
+- **--priority** (optional): `urgent` | `high` | `normal` | `low`. Defaults to `normal`
 - **--project** (optional): Project grouping
 
 Example:
@@ -87,7 +87,7 @@ cortextos bus list-tasks [--status S] [--agent A] [--priority P] [--all-orgs]
 
 - **--status**: Filter by `pending` | `in_progress` | `blocked` | `completed`
 - **--agent**: Filter by agent name
-- **--priority**: Filter by `critical` | `high` | `normal` | `low`
+- **--priority**: Filter by `urgent` | `high` | `normal` | `low`
 - **--all-orgs**: Show tasks across all orgs
 
 Example:
@@ -347,7 +347,7 @@ cortextos bus evaluate-experiment <experiment_id> <measured_value> [--score <1-1
 List experiments with filters.
 
 ```bash
-cortextos bus list-experiments [--agent <name>] [--status <status>] [--metric <name>] [--limit <N>] [--json]
+cortextos bus list-experiments [--agent <name>] [--status <status>] [--metric <name>] [--json]
 ```
 
 ### gather-context
