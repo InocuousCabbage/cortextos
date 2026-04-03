@@ -9,6 +9,37 @@ import type { User } from './types';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
+  // Force simple cookie names without __Secure- / __Host- prefixes.
+  // NextAuth v5 auto-enables these for HTTPS (including Cloudflare tunnels via
+  // X-Forwarded-Proto), but tunnel proxies may not forward Secure-prefixed
+  // cookies reliably. The middleware checks for authjs.session-token, so this
+  // must stay consistent.
+  cookies: {
+    sessionToken: {
+      name: 'authjs.session-token',
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: false },
+    },
+    csrfToken: {
+      name: 'authjs.csrf-token',
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: false },
+    },
+    callbackUrl: {
+      name: 'authjs.callback-url',
+      options: { sameSite: 'lax', path: '/', secure: false },
+    },
+    pkceCodeVerifier: {
+      name: 'authjs.pkce.code_verifier',
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: false },
+    },
+    state: {
+      name: 'authjs.state',
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: false },
+    },
+    nonce: {
+      name: 'authjs.nonce',
+      options: { httpOnly: true, sameSite: 'lax', path: '/', secure: false },
+    },
+  },
   providers: [
     Credentials({
       name: 'Credentials',
