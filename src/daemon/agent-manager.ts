@@ -149,7 +149,7 @@ export class AgentManager {
           }
         }
 
-        const from = msg.from?.first_name || msg.from?.username || 'Unknown';
+        const from = stripControlChars(msg.from?.first_name || msg.from?.username || 'Unknown');
         const msgChatId = msg.chat?.id;
         const effectiveChatId = msgChatId ?? chatId ?? '';
         const stateDir = join(this.ctxRoot, 'state', name);

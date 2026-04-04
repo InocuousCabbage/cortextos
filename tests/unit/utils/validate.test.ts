@@ -8,6 +8,7 @@ import {
   validateApprovalCategory,
   validateModel,
   isValidJson,
+  stripControlChars,
 } from '../../../src/utils/validate';
 
 describe('validateInstanceId', () => {
@@ -96,6 +97,39 @@ describe('validateModel', () => {
 
   it('rejects invalid models', () => {
     expect(() => validateModel('model; rm -rf /')).toThrow();
+  });
+});
+
+describe('stripControlChars', () => {
+  it('passes through clean strings unchanged', () => {
+    expect(stripControlChars('Hello World')).toBe('Hello World');
+    expect(stripControlChars('James')).toBe('James');
+    expect(stripControlChars('')).toBe('');
+  });
+
+  it('strips ANSI CSI escape sequences', () => {
+    expect(stripControlChars('\x1b[31mRed\x1b[0m')).toBe('Red');
+    expect(stripControlChars('\x1b[1;32mBold Green\x1b[0m')).toBe('Bold Green');
+  });
+
+  it('strips OSC sequences', () => {
+    expect(stripControlChars('\x1b]0;title\x07text')).toBe('text');
+  });
+
+  it('strips other ESC sequences', () => {
+    expect(stripControlChars('\x1bcReset')).toBe('Reset');
+  });
+
+  it('strips C0 control characters but preserves newlines and tabs', () => {
+    // null byte stripped
+    expect(stripControlChars('a\x00b')).toBe('ab');
+    // bell stripped
+    expect(stripControlChars('a\x07b')).toBe('ab');
+  });
+
+  it('protects against Telegram sender name injection', () => {
+    const malicious = '\x1b[31mEvil\x1b[0m';
+    expect(stripControlChars(malicious)).toBe('Evil');
   });
 });
 
