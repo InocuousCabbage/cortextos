@@ -60,7 +60,7 @@ flowchart TD
 npm install -g pm2
 
 # 2. Install cortextOS
-curl -fsSL https://get.cortextos.dev/install.mjs | node
+curl -fsSL https://raw.githubusercontent.com/grandamenium/cortextos/main/install.mjs | node
 
 # 3. Open the project in Claude Code and run guided onboarding
 claude ~/cortextos

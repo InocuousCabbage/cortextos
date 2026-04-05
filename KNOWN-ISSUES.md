@@ -1,27 +1,19 @@
 # cortextOS — Known Issues & Installation Blockers
 
-Last updated: 2026-04-02  
+Last updated: 2026-04-05  
 Covers: Node.js v0.1.1 (grandamenium/cortextos, `main` branch)
 
 ---
 
-## 1. Critical Blockers (prevents install/launch entirely)
+## 1. Installation Issues
 
-### 1.1 Install URL is dead and repo is private
+### 1.1 ~~Install URL is dead and repo is private~~ — RESOLVED
 
-**What breaks:** The primary install method documented in README.md fails completely.
+The install URL now points to GitHub raw content and the repo is public:
 
 ```bash
-curl -fsSL https://get.cortextos.dev/install.mjs | node   # HTTP 000 — domain does not resolve
+curl -fsSL https://raw.githubusercontent.com/grandamenium/cortextos/main/install.mjs | node
 ```
-
-- `https://get.cortextos.dev` does not exist. curl returns `000` (no response).
-- The GitHub repo `grandamenium/cortextos` is **private**. New users cloning via the REPO_URL in `install.mjs` will receive a 403 unless they have been granted access.
-- There is no npm package published (the `package.json` has `"license": "UNLICENSED"` and `files` is limited to `dist/` and `templates/`; no npm publish workflow exists).
-
-**Impact:** A brand-new user following the README cannot install cortextOS at all without out-of-band repo access.
-
-**File references:** `install.mjs:15`, `README.md:63`, `package.json`
 
 ---
 

@@ -2,8 +2,8 @@
 /**
  * cortextOS cross-platform installer
  *
- * Mac/Linux:   curl -fsSL https://get.cortextos.dev/install.mjs | node
- * Windows:     node -e "$(irm https://get.cortextos.dev/install.mjs)"
+ * Mac/Linux:   curl -fsSL https://raw.githubusercontent.com/grandamenium/cortextos/main/install.mjs | node
+ * Windows:     node -e "$(irm https://raw.githubusercontent.com/grandamenium/cortextos/main/install.mjs)"
  * Local test:  node install.mjs
  */
 
