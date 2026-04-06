@@ -3,6 +3,7 @@ import {
   getPendingApprovals,
   getResolvedApprovals,
 } from '@/lib/data/approvals';
+import { syncAll } from '@/lib/sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,8 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
+
+  try { syncAll(); } catch { /* best-effort */ }
 
   const status = searchParams.get('status') || 'pending';
   const org = searchParams.get('org') || undefined;

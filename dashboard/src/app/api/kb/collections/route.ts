@@ -71,14 +71,8 @@ export async function GET(request: NextRequest) {
     return Response.json({ collections: [], org });
   }
 
-  try {
-    const rawOut = execFileSync(pythonPath, [mmragPath, 'collections'], {
-      timeout: 15000,
-      encoding: 'utf-8',
-      env: env as NodeJS.ProcessEnv,
-    });
-
-    // Parse tabular output: "collection_name  N"
+  // Helper: parse tabular output from mmrag.py collections command
+  function parseCollectionsOutput(rawOut: string): Array<{ name: string; count: number }> {
     const collections: Array<{ name: string; count: number }> = [];
     for (const line of rawOut.trim().split('\n')) {
       if (!line || line.startsWith('Collection') || line.startsWith('---')) continue;
@@ -91,18 +85,34 @@ export async function GET(request: NextRequest) {
         }
       }
     }
+    return collections;
+  }
 
-    return Response.json({ collections, org });
+  let rawOut = '';
+  try {
+    rawOut = execFileSync(pythonPath, [mmragPath, 'collections'], {
+      timeout: 15000,
+      encoding: 'utf-8',
+      env: env as NodeJS.ProcessEnv,
+    });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (
-      message.includes('not set up') ||
-      message.includes('No collections') ||
-      message.includes('not found')
-    ) {
+    // ChromaDB may crash mid-output (e.g. pickle corruption) after printing some collections.
+    // Recover partial stdout rather than returning 500.
+    const execErr = err as { stdout?: string; message?: string };
+    rawOut = execErr.stdout || '';
+    if (!rawOut) {
+      const message = execErr.message || String(err);
+      if (
+        message.includes('not set up') ||
+        message.includes('No collections') ||
+        message.includes('not found')
+      ) {
+        return Response.json({ collections: [], org });
+      }
+      console.error('[api/kb/collections] Error:', message);
       return Response.json({ collections: [], org });
     }
-    console.error('[api/kb/collections] Error:', message);
-    return Response.json({ error: 'Failed to list collections' }, { status: 500 });
   }
+
+  return Response.json({ collections: parseCollectionsOutput(rawOut), org });
 }

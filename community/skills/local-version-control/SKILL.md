@@ -2,6 +2,7 @@
 name: local-version-control
 description: "Daily git snapshots of agent workspace changes. Stages files with safety checks, reviews diff for PII, commits with descriptive message. Never pushes automatically."
 triggers: ["auto-commit", "git snapshot", "commit changes", "version control"]
+external_calls: []
 ---
 
 # Local Version Control

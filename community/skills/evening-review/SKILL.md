@@ -2,6 +2,7 @@
 name: evening-review
 description: "End-of-day review workflow. Triggered by evening cron. Summarizes the day across all agents, evaluates orchestrator performance, prepares tomorrow, proposes overnight work for approval."
 triggers: ["evening review", "end of day", "nightly review", "run evening review", "day summary", "overnight tasks", "wrap up the day"]
+external_calls: []
 ---
 
 # Evening Review

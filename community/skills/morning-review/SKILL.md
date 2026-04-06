@@ -2,6 +2,7 @@
 name: morning-review
 description: "Daily morning briefing workflow. Triggered by morning cron. Pulls overnight agent work, checks goals state, cascades goals to agents, schedules tasks, sends briefing to user."
 triggers: ["morning review", "morning briefing", "good morning", "start my day", "daily briefing", "run morning review"]
+external_calls: []
 ---
 
 # Morning Review

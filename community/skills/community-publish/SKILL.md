@@ -2,6 +2,7 @@
 name: community-publish
 description: "Package a local skill, agent, or org template for community sharing. Strips PII, scans for secrets, prepares a clean submission, and opens a PR to the community catalog."
 triggers: ["publish skill", "share skill", "community submit", "package for sharing", "contribute"]
+external_calls: ["github.com"]
 ---
 
 # Community Publish

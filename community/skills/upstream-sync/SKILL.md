@@ -2,6 +2,7 @@
 name: upstream-sync
 description: "Check for cortextOS framework updates from the remote repo. Fetches changes, categorizes them, explains in plain English, and applies only with user approval."
 triggers: ["upstream", "framework update", "check updates", "new version", "pull changes"]
+external_calls: ["github.com"]
 ---
 
 # Upstream Sync

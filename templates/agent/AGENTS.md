@@ -31,13 +31,18 @@ Complete the following in order. Do not skip steps.
 4. Discover available skills: `cortextos bus list-skills --format text`
 5. Discover active agents: `cortextos bus list-agents` (live roster from enabled-agents.json)
 6. Restore crons from `config.json` — run CronList first (no duplicates). For each entry: if `type: "recurring"` (or no type), call `/loop {interval} {prompt}`; if `type: "once"`, check `fire_at` — recreate via CronCreate if still in the future, or delete from config.json if expired. Do NOT assume crons survived a restart.
-7. Check today's memory file (`memory/$(date -u +%Y-%m-%d).md`) for any in-progress work
-8. If resuming a task, query the knowledge base: `cortextos bus kb-query "<task topic>" --org $CTX_ORG`
-9. Check inbox: `cortextos bus check-inbox`
-10. Update heartbeat: `cortextos bus update-heartbeat "online"`
-11. Log session start: `cortextos bus log-event action session_start info --meta '{"agent":"'$CTX_AGENT_NAME'"}'`
-12. Write session start entry to daily memory (see Memory Protocol below)
-13. Send your full online status message — **only AFTER crons are confirmed set**. Tell them: crons running, pending messages, and what you are picking up from last session.
+7. Recall recent session facts (cross-session memory from past compactions):
+   ```bash
+   cortextos bus recall-facts --days 3
+   ```
+   Read these before the daily memory file — they capture granular decisions and outcomes from previous sessions that did not make it into MEMORY.md.
+8. Check today's memory file (`memory/$(date -u +%Y-%m-%d).md`) for any in-progress work
+9. If resuming a task, query the knowledge base: `cortextos bus kb-query "<task topic>" --org $CTX_ORG`
+10. Check inbox: `cortextos bus check-inbox`
+11. Update heartbeat: `cortextos bus update-heartbeat "online"`
+12. Log session start: `cortextos bus log-event action session_start info --meta '{"agent":"'$CTX_AGENT_NAME'"}'`
+13. Write session start entry to daily memory (see Memory Protocol below)
+14. Send your full online status message — **only AFTER crons are confirmed set**. Tell them: crons running, pending messages, and what you are picking up from last session.
 
 ---
 
@@ -383,6 +388,8 @@ Reply using: cortextos bus send-telegram <chat_id> "<reply>"
 Photos include a `local_file:` path. Callbacks include `callback_data:` and `message_id:`. Process all immediately and reply using the command shown.
 
 **Waiting for a response:** If you send a Telegram message that asks a question and you need the answer before continuing, you MUST end your current response (stop all tool execution, produce no more output). The user's reply will be injected into your conversation as your next turn by the fast-checker. If you keep executing tools, the reply gets queued and you will never see it. End your turn, and the reply arrives.
+
+**Slash commands from Telegram:** If the message text starts with `/` (e.g. `/loop 4h heartbeat`, `/commit`, `/restart`), treat it as a command to execute — use the Skill tool to invoke it. Parse: `/skillname [args]` → invoke `Skill(skill="skillname", args="[args]")`. Common commands: `/loop` (create cron), `/compact` (compact context), `/restart` (restart agent). If the skill doesn't exist, reply telling the user which skills are available via `cortextos bus list-skills`.
 
 **Formatting:** Use Telegram's regular Markdown (NOT MarkdownV2). Do NOT escape characters like `!`, `.`, `(`, `)`, `-` with backslashes. Only `_`, `*`, `` ` ``, and `[` have special meaning.
 

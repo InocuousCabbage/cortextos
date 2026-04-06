@@ -60,7 +60,8 @@ export type EventCategory =
   | 'heartbeat'
   | 'message'
   | 'task'
-  | 'approval';
+  | 'approval'
+  | 'agent_activity';
 
 export type EventSeverity = 'info' | 'warning' | 'error' | 'critical';
 

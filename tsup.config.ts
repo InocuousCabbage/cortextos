@@ -9,6 +9,7 @@ export default defineConfig({
     'hooks/hook-planmode-telegram': 'src/hooks/hook-planmode-telegram.ts',
     'hooks/hook-crash-alert': 'src/hooks/hook-crash-alert.ts',
     'hooks/hook-compact-telegram': 'src/hooks/hook-compact-telegram.ts',
+    'hooks/hook-extract-facts': 'src/hooks/hook-extract-facts.ts',
   },
   format: ['cjs'],
   target: 'node20',

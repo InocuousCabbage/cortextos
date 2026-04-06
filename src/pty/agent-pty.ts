@@ -243,10 +243,11 @@ export class AgentPTY {
    * Kill the PTY process.
    */
   kill(): void {
-    if (this.pty) {
+    const pty = this.pty;
+    if (pty) {
       this._alive = false;
-      this.pty.kill();
       this.pty = null;
+      pty.kill();
     }
   }
 

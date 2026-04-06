@@ -2,6 +2,7 @@
 name: goal-management
 description: "Daily goal lifecycle management. Use for: morning briefing goal cascade, setting daily focus, refreshing agent goals, reviewing goal progress. Triggered daily as part of morning review."
 triggers: ["goals", "daily focus", "priorities", "what should we work on", "goal cascade", "set goals", "update goals", "goal management", "north star"]
+external_calls: []
 ---
 
 # Goal Management

@@ -58,6 +58,8 @@ Agent secrets: `orgs/{org}/agents/{agent}/.env`
 | `log-event <category> <name> <severity> --meta '<json>'` | Log structured event |
 | `update-heartbeat "<task summary>"` | Prove you're alive to the dashboard |
 | `read-all-heartbeats [--format json\|text]` | Aggregate fleet heartbeats |
+| `recall-facts [--days 3]` | Recall session facts extracted at compaction (cross-session memory) |
+| `tui-stream [--session <name>] [--telegram] [--dry-run]` | Stream TUI tool activity to event log and Telegram |
 
 ### Approvals — full docs: `.claude/skills/approvals/SKILL.md`
 | Command | What it does |

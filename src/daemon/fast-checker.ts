@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, existsSync, statSync, writeFileSync, unlinkSync } from 'fs';
+import { readdirSync, readFileSync, existsSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { createHash } from 'crypto';
 import type { InboxMessage, BusPaths, TelegramMessage, TelegramCallbackQuery } from '../types/index.js';
@@ -20,8 +20,11 @@ export class FastChecker {
   private running: boolean = false;
   private pollInterval: number;
   private log: LogFn;
-  private prevLogSize: number = 0;
   private typingLastSent: number = 0;
+  // Hook-based typing: track when we last injected a Telegram message (ms)
+  private lastMessageInjectedAt: number = 0;
+  // Track outbound message log size to detect when agent sends a reply
+  private outboundLogSize: number = 0;
   private frameworkRoot: string;
   private telegramApi?: TelegramAPI;
   private chatId?: string;
@@ -128,9 +131,11 @@ export class FastChecker {
     const ackIds: string[] = [];
 
     // Process queued Telegram messages
+    let hasTelegramMessage = false;
     while (this.telegramMessages.length > 0) {
       const msg = this.telegramMessages.shift()!;
       messageBlock += msg.formatted;
+      hasTelegramMessage = true;
     }
 
     // Check agent inbox
@@ -149,6 +154,12 @@ export class FastChecker {
           ackInbox(this.paths, id);
         }
         this.log(`Injected ${messageBlock.length} bytes`);
+        // Only update typing timestamp for Telegram messages, not inbox/cron.
+        // Inbox messages (agent-to-agent, session continuations) must not
+        // restart the typing indicator after Stop has cleared it.
+        if (hasTelegramMessage) {
+          this.lastMessageInjectedAt = Date.now();
+        }
         // Cooldown after injection
         await sleep(5000);
       }
@@ -198,10 +209,14 @@ Reply using: cortextos bus send-message ${msg.from} normal '<your reply>' ${msg.
     }
 
     // Use [USER: ...] wrapper to prevent prompt injection via crafted display names
+    // Slash commands (text starting with /) are NOT wrapped in backticks so Claude Code
+    // can recognize and invoke them via the Skill tool (e.g. /loop, /commit, /restart).
+    const isSlashCommand = /^\/[a-zA-Z]/.test(text.trim());
+    const body = isSlashCommand
+      ? text.trim()
+      : `\`\`\`\n${text}\n\`\`\``;
     return `=== TELEGRAM from [USER: ${from}] (chat_id:${chatId}) ===
-${replyCx}\`\`\`
-${text}
-\`\`\`
+${replyCx}${body}
 ${lastSentCtx}Reply using: cortextos bus send-telegram ${chatId} "<your reply>"
 
 `;
@@ -704,19 +719,54 @@ Reply using: cortextos bus send-telegram ${chatId} "<your reply>"
   }
 
   /**
-   * Check if the agent is actively producing output (typing indicator).
+   * Check if the agent is actively working on a response (typing indicator).
+   *
+   * Hook-based approach:
+   *   - fast-checker records when it injected a message (lastMessageInjectedAt)
+   *   - Stop hook writes a Unix timestamp to state/<agent>/last_idle.flag
+   *   - Typing = message was injected AND last_idle.flag is older than injection
+   *     AND injection was within the last 10 minutes
+   *
+   * This is accurate: typing starts when user sends a message, clears the
+   * moment Claude finishes its turn (Stop fires). No false positives from TUI.
    */
   isAgentActive(): boolean {
-    const logPath = join(this.paths.logDir, 'stdout.log');
+    if (this.lastMessageInjectedAt === 0) return false;
+
+    const now = Date.now();
+    const tenMinMs = 10 * 60 * 1000;
+    if (now - this.lastMessageInjectedAt > tenMinMs) return false;
+
+    // Clear typing immediately when the agent sends a reply.
+    // outbound-messages.jsonl grows each time the agent calls send-telegram.
+    const outboundPath = join(this.paths.logDir, 'outbound-messages.jsonl');
     try {
-      if (!existsSync(logPath)) return false;
-      const stat = statSync(logPath);
-      const currentSize = stat.size;
-      const wasActive = currentSize !== this.prevLogSize;
-      this.prevLogSize = currentSize;
-      return wasActive;
+      if (existsSync(outboundPath)) {
+        const { size } = require('fs').statSync(outboundPath);
+        if (this.outboundLogSize === 0) {
+          // First check: seed baseline, don't trigger yet
+          this.outboundLogSize = size;
+        } else if (size > this.outboundLogSize) {
+          // New reply sent — clear typing state
+          this.outboundLogSize = size;
+          this.lastMessageInjectedAt = 0;
+          return false;
+        }
+      }
+    } catch { /* non-critical */ }
+
+    // Read last_idle.flag written by the Stop hook
+    const flagPath = join(this.paths.stateDir, 'last_idle.flag');
+    try {
+      if (!existsSync(flagPath)) {
+        // No idle flag yet — hook hasn't fired, so still working
+        return true;
+      }
+      const idleTs = parseInt(readFileSync(flagPath, 'utf-8').trim(), 10) * 1000;
+      // Typing if injection happened AFTER the last idle signal
+      return this.lastMessageInjectedAt > idleTs;
     } catch {
-      return false;
+      return true; // Can't read flag — assume still active
     }
   }
 }

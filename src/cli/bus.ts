@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { spawnSync } from 'child_process';
+import { spawnSync, execFileSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { sendMessage, checkInbox, ackInbox } from '../bus/message.js';
@@ -294,6 +294,59 @@ busCommand
       const label = hb.display_name ? `${hb.display_name} (${hb.agent})` : hb.agent;
       console.log(`${label} (${hb.org}) — ${hb.status}${staleFlag} — last seen ${hb.last_heartbeat}`);
       if (hb.current_task) console.log(`  task: ${hb.current_task}`);
+    }
+  });
+
+busCommand
+  .command('recall-facts')
+  .description('Recall recent session facts extracted at compaction time (cross-session memory)')
+  .option('--days <n>', 'How many days back to scan', '3')
+  .option('--format <fmt>', 'Output format: text or json', 'text')
+  .option('--agent <name>', 'Agent name (defaults to CTX_AGENT_NAME)')
+  .action((opts: { days: string; format: string; agent?: string }) => {
+    const env = resolveEnv();
+    const agentName = opts.agent || env.agentName;
+    const daysBack = Math.max(1, Math.min(30, parseInt(opts.days, 10) || 3));
+    const factsDir = join(env.ctxRoot, 'state', agentName, 'memory', 'facts');
+
+    const entries: Array<{ ts: string; session_id: string; summary: string; keywords: string[] }> = [];
+
+    for (let d = 0; d < daysBack; d++) {
+      const date = new Date(Date.now() - d * 24 * 60 * 60 * 1000);
+      const dateStr = date.toISOString().slice(0, 10);
+      const factsFile = join(factsDir, `${dateStr}.jsonl`);
+      if (!existsSync(factsFile)) continue;
+      try {
+        const lines = readFileSync(factsFile, 'utf-8').split('\n').filter(l => l.trim());
+        for (const line of lines) {
+          try {
+            entries.push(JSON.parse(line));
+          } catch { /* skip corrupt lines */ }
+        }
+      } catch { /* skip unreadable files */ }
+    }
+
+    if (opts.format === 'json') {
+      console.log(JSON.stringify(entries, null, 2));
+      return;
+    }
+
+    if (entries.length === 0) {
+      console.log('No session facts found. Facts are written automatically at context compaction.');
+      return;
+    }
+
+    console.log(`\n  Session Memory — last ${daysBack} day(s) — ${entries.length} entries\n`);
+    for (const e of entries.slice(-10)) { // Show last 10 entries
+      const ts = e.ts.replace('T', ' ').replace('Z', ' UTC').slice(0, 19);
+      console.log(`  [${ts}]`);
+      // Print first 400 chars of summary
+      const preview = e.summary.slice(0, 400).replace(/\n/g, ' ');
+      console.log(`  ${preview}${e.summary.length > 400 ? '...' : ''}`);
+      if (e.keywords && e.keywords.length > 0) {
+        console.log(`  Keywords: ${e.keywords.slice(0, 8).join(', ')}`);
+      }
+      console.log();
     }
   });
 
@@ -1488,6 +1541,11 @@ busCommand
   .description('PreCompact hook: notify user via Telegram when context compaction starts (#18)')
   .action(() => runHook('hook-compact-telegram'));
 
+busCommand
+  .command('hook-idle-flag')
+  .description('Stop hook: writes last_idle.flag timestamp so fast-checker knows agent finished its turn')
+  .action(() => runHook('hook-idle-flag'));
+
 // --- OAuth token rotation commands ---
 
 busCommand
@@ -1586,6 +1644,141 @@ busCommand
       console.log(`  5h: ${pct(acct.five_hour_utilization)}${warn5h}  7d: ${pct(acct.seven_day_utilization)}${warn7d}  expires: ${expiry}`);
     }
   });
+
+busCommand
+  .command('tui-stream')
+  .description('Stream Claude Code TUI tool activity to the event log and optionally Telegram')
+  .option('--session <name>', 'tmux session name (defaults to CTX_AGENT_NAME)')
+  .option('--interval <ms>', 'Poll interval in milliseconds', '2000')
+  .option('--telegram', 'Forward high-signal events to Telegram chat', false)
+  .option('--dry-run', 'Print events to stdout instead of logging', false)
+  .action(async (opts: { session?: string; interval: string; telegram: boolean; dryRun: boolean }) => {
+    const env = resolveEnv();
+    const paths = resolvePaths(env.agentName, env.instanceId, env.org);
+    const sessionName = opts.session || env.agentName;
+    const pollMs = Math.max(500, parseInt(opts.interval, 10) || 2000);
+
+    // High-signal patterns: tool calls that indicate real work
+    const HIGH_SIGNAL = [
+      /^[├│└].*Tool:\s*(Bash|Edit|Write|Read|Glob|Grep|WebFetch|WebSearch|Agent)/i,
+      /^[├│└].*Running bash command/i,
+      /^[├│└].*Editing file/i,
+      /^[├│└].*Writing file/i,
+      /^[├│└].*Reading file/i,
+      /error|Error|ERROR/,
+      /✓.*completed|✗.*failed/i,
+      /Permission (request|denied|approved)/i,
+    ];
+
+    const TOOL_LINE = /^[├│└▶◆●]|^(Tool|Bash|Edit|Write|Read|Glob|Grep|Agent):/i;
+
+    let prevOutput = '';
+    let telegramApi: any = null;
+    let chatId: string | undefined;
+
+    // Set up Telegram if requested
+    if (opts.telegram) {
+      const { TelegramAPI } = await import('../telegram/api.js');
+      const agentDir = process.env.CTX_AGENT_DIR || process.cwd();
+      const envPath = join(agentDir, '.env');
+      if (existsSync(envPath)) {
+        const envContent = readFileSync(envPath, 'utf-8');
+        const botTokenMatch = envContent.match(/^BOT_TOKEN=(.+)$/m);
+        const chatIdMatch = envContent.match(/^CHAT_ID=(.+)$/m);
+        if (botTokenMatch && chatIdMatch) {
+          telegramApi = new TelegramAPI(botTokenMatch[1].trim());
+          chatId = chatIdMatch[1].trim();
+        }
+      }
+    }
+
+    const logLine = (msg: string) => {
+      if (opts.dryRun) {
+        console.log(msg);
+      }
+    };
+
+    let lastTelegramSent = 0;
+    const TELEGRAM_COOLDOWN_MS = 10000; // max 1 Telegram message per 10s
+
+    logLine(`[tui-stream] Watching tmux session: ${sessionName} (poll: ${pollMs}ms)`);
+
+    // Poll loop
+    while (true) {
+      try {
+        // Capture current tmux pane content
+        let currentOutput = '';
+        try {
+          const result = execFileSync('tmux', ['capture-pane', '-t', sessionName, '-p'], {
+            encoding: 'utf-8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+          });
+          currentOutput = result;
+        } catch {
+          // Session not found or tmux not available — wait and retry
+          await sleepMs(pollMs * 5);
+          continue;
+        }
+
+        // Diff: find new lines appended since last poll
+        const prevLines = prevOutput.split('\n');
+        const currLines = currentOutput.split('\n');
+        const newLines = currLines.length > prevLines.length
+          ? currLines.slice(prevLines.length - 1)
+          : currLines.filter(l => !prevOutput.includes(l));
+
+        prevOutput = currentOutput;
+
+        if (newLines.length === 0) {
+          await sleepMs(pollMs);
+          continue;
+        }
+
+        // Filter to tool-call lines only
+        const toolLines = newLines.filter(l => {
+          const t = l.trim();
+          return t.length > 0 && (TOOL_LINE.test(t) || t.startsWith('●') || t.startsWith('◆'));
+        });
+
+        for (const line of toolLines) {
+          const trimmed = line.trim().slice(0, 200);
+          const isHighSignal = HIGH_SIGNAL.some(re => re.test(trimmed));
+
+          // Log to event bus
+          if (!opts.dryRun) {
+            try {
+              logEvent(paths, env.agentName, env.org, 'agent_activity' as any, 'tool_call', 'info', {
+                line: trimmed,
+                session: sessionName,
+                high_signal: isHighSignal,
+              });
+            } catch { /* Never fail the stream */ }
+          } else {
+            logLine(`[event] ${trimmed}`);
+          }
+
+          // Forward high-signal events to Telegram (rate-limited)
+          if (isHighSignal && opts.telegram && telegramApi && chatId) {
+            const now = Date.now();
+            if (now - lastTelegramSent >= TELEGRAM_COOLDOWN_MS) {
+              lastTelegramSent = now;
+              try {
+                await telegramApi.sendMessage(chatId, `[${env.agentName}] ${trimmed}`);
+              } catch { /* Never fail the stream */ }
+            }
+          }
+        }
+      } catch {
+        // Continue on any error
+      }
+
+      await sleepMs(pollMs);
+    }
+  });
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 function pct(v: number): string {
   return `${Math.round(v * 100)}%`;

@@ -24,6 +24,8 @@ const VALID_PRIORITIES = ['urgent', 'high', 'normal', 'low'];
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
 
+  try { syncAll(); } catch { /* best-effort */ }
+
   const filters = {
     org: searchParams.get('org') || undefined,
     agent: searchParams.get('agent') || undefined,

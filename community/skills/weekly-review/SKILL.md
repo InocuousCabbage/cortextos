@@ -2,6 +2,7 @@
 name: weekly-review
 description: "Weekly comprehensive synthesis. Run Sunday evening or when user requests. Reviews week's accomplishments across all agents, evaluates performance, plans next week."
 triggers: ["weekly review", "weekly check-in", "end of week", "week summary", "run weekly review", "weekly briefing"]
+external_calls: []
 ---
 
 # Weekly Review

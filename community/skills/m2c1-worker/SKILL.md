@@ -2,6 +2,7 @@
 name: m2c1-worker
 description: "You need to build software autonomously — a new project, a major feature, or any structured development task. You will act as the 'human' supervisor for a dedicated M2C1 worker session, managing it through all 12 phases: provide the brain dump, answer discovery questions, configure tools and credentials, monitor progress via bus messages and git, validate the output, and clean up when done. Use when the work is large enough to warrant a dedicated isolated build session."
 triggers: ["build", "m2c1", "worker agent", "autonomous build", "spin up worker", "new project", "build from scratch", "create software", "develop a tool", "full build", "m2c1 worker"]
+external_calls: []
 ---
 
 # M2C1 Worker Agent Skill

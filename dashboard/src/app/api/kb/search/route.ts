@@ -136,8 +136,13 @@ export async function GET(request: NextRequest) {
 
   /**
    * Run a single mmrag.py query against one collection.
+   * Returns empty array (never throws) — callers handle missing/empty collections gracefully.
    */
-  function runQuery(col: string): string {
+  function runQuery(col: string): Array<{
+    content?: string; result?: string; similarity?: number;
+    source?: string; type?: string; filename?: string;
+    chunk_index?: number; total_chunks?: number; content_full_length?: number;
+  }> {
     const pyArgs = [
       mmragPath, 'query', q,
       '--collection', col,
@@ -145,19 +150,19 @@ export async function GET(request: NextRequest) {
       '--threshold', String(threshold),
       '--json',
     ];
-    return execFileSync(pythonPath, pyArgs, {
-      timeout: 30000,
-      encoding: 'utf-8',
-      env: env as NodeJS.ProcessEnv,
-    });
-  }
-
-  // Helper: parse mmrag.py JSON output from a single query
-  function parseQueryOutput(output: string): Array<{
-    content?: string; result?: string; similarity?: number;
-    source?: string; type?: string; filename?: string;
-  }> {
-    const trimmed = output.trim();
+    let stdout = '';
+    try {
+      stdout = execFileSync(pythonPath, pyArgs, {
+        timeout: 30000,
+        encoding: 'utf-8',
+        env: env as NodeJS.ProcessEnv,
+      });
+    } catch (e: unknown) {
+      // On non-zero exit, try to recover stdout (partial output)
+      stdout = (e as { stdout?: string }).stdout || '';
+      if (!stdout) return [];
+    }
+    const trimmed = stdout.trim();
     const jsonStart = trimmed.indexOf('{');
     if (jsonStart === -1) return [];
     try {
@@ -166,56 +171,101 @@ export async function GET(request: NextRequest) {
     } catch { return []; }
   }
 
+  /**
+   * List available collection names for the org by running mmrag.py collections.
+   * Handles partial output (ChromaDB pickle corruption may crash mid-output).
+   */
+  function listCollections(): string[] {
+    let stdout = '';
+    try {
+      stdout = execFileSync(pythonPath, [mmragPath, 'collections'], {
+        timeout: 15000,
+        encoding: 'utf-8',
+        env: env as NodeJS.ProcessEnv,
+      });
+    } catch (e: unknown) {
+      stdout = (e as { stdout?: string }).stdout || '';
+      if (!stdout) return [];
+    }
+    const names: string[] = [];
+    for (const line of stdout.trim().split('\n')) {
+      if (!line || line.startsWith('Collection') || line.startsWith('---')) continue;
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const name = parts.slice(0, parts.length - 1).join(' ');
+        if (name) names.push(name);
+      }
+    }
+    return names;
+  }
+
   try {
     let allResults: Array<{
       content?: string; result?: string; similarity?: number;
       source?: string; type?: string; filename?: string;
+      chunk_index?: number; total_chunks?: number; content_full_length?: number;
     }> = [];
 
     if (collection) {
-      // Single collection query
-      const stdout = runQuery(collection);
-      allResults = parseQueryOutput(stdout);
+      // Explicit collection requested — query it directly
+      allResults = runQuery(collection);
     } else {
-      // "all" scope: query shared, then agent-private if agent set, merge results
-      try { allResults.push(...parseQueryOutput(runQuery(`shared-${org}`))); } catch { /* ignore */ }
-      if (agent) {
-        try { allResults.push(...parseQueryOutput(runQuery(`agent-${agent}`))); } catch { /* ignore */ }
+      // scope=all: discover available collections and query each one.
+      // Prefer this over hardcoded "shared-{org}" because many installs only
+      // have agent-* collections (no shared collection ingested yet).
+      const knownCollections = listCollections();
+
+      if (knownCollections.length > 0) {
+        for (const col of knownCollections) {
+          // Filter by scope
+          const isShared = col.startsWith('shared-');
+          const isPrivate = col.startsWith('agent-');
+          const matchesScope =
+            scope === 'all' ||
+            (scope === 'shared' && isShared) ||
+            (scope === 'private' && isPrivate);
+          // If agent is specified for private scope, only that agent's collection
+          const matchesAgent =
+            !agent || !isPrivate || col === `agent-${agent}`;
+
+          if (matchesScope && matchesAgent) {
+            const colResults = runQuery(col);
+            // Tag each result with its collection name for display
+            allResults.push(...colResults.map(r => ({ ...r, _collection: col })));
+          }
+        }
+      } else {
+        // Fallback: no collection list available, try conventional names
+        allResults.push(...runQuery(`shared-${org}`));
+        if (agent) allResults.push(...runQuery(`agent-${agent}`));
       }
+
+      // Sort merged results by similarity descending, deduplicate by content hash
+      allResults.sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0));
+      const seen = new Set<string>();
+      allResults = allResults.filter(r => {
+        const k = (r.source || '') + '::' + (r.content || r.result || '').slice(0, 100);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+      // Apply limit after merge
+      allResults = allResults.slice(0, limit);
     }
 
     if (allResults.length === 0) {
       return Response.json({ results: [], total: 0, query: q, collection: `shared-${org}` });
     }
 
-    // Build a synthetic raw object for the existing mapping code below
-    const raw = { results: allResults } as {
-      results?: Array<{
-        content?: string;
-        result?: string;
-        similarity?: number;
-        source?: string;
-        type?: string;
-        filename?: string;
-        chunk_index?: number;
-        total_chunks?: number;
-        content_full_length?: number;
-      }>;
-      result_count?: number;
-      query?: string;
-      collection?: string;
-      agent_name?: string;
-      org?: string;
-    };
-
-    const results = (raw.results || []).map((r) => ({
+    const results = allResults.map((r) => ({
       content: r.content || r.result || '',
       source_file: r.source || '',
-      agent_name: raw.agent_name || agent || undefined,
-      org: raw.org || org || '',
+      agent_name: agent || undefined,
+      org: org || '',
       score: r.similarity ?? 0,
       doc_type: r.type || 'text',
       filename: r.filename || '',
+      collection: (r as { _collection?: string })._collection || collection || `shared-${org}`,
       chunk_index: r.chunk_index ?? null,
       total_chunks: r.total_chunks ?? null,
       content_full_length: r.content_full_length ?? null,
@@ -223,9 +273,9 @@ export async function GET(request: NextRequest) {
 
     return Response.json({
       results,
-      total: raw.result_count ?? results.length,
+      total: results.length,
       query: q,
-      collection: raw.collection || `shared-${org}`,
+      collection: collection || 'all',
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

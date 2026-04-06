@@ -2,6 +2,7 @@
 name: theta-wave
 description: "Your role in the theta wave system improvement cycle. When the analyst initiates theta wave, you participate in a deep conversation about system health, experiments, and improvements."
 triggers: ["theta wave", "system review", "analyst findings", "theta wave initiated", "system health review", "improvement cycle"]
+external_calls: []
 ---
 
 # Theta Wave — Orchestrator Role

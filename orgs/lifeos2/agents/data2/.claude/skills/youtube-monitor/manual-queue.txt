@@ -1,0 +1,6 @@
+# Manual URL queue — operator fallback for high-signal YouTube videos
+# Add one YouTube URL per line. Pipeline fetches transcript and adds to digest as source: manual.
+# Lines starting with # are ignored.
+# Usage: append URLs here when automated discovery fails or misses a specific video.
+# Example:
+#   https://www.youtube.com/watch?v=dQw4w9WgXcQ

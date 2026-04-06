@@ -2,6 +2,7 @@
 name: catalog-browse
 description: "Browse the community catalog for new skills, agent templates, and org templates. Discover what is available and recommend useful items to the user."
 triggers: ["catalog", "browse skills", "community", "find skill", "new skills available", "what skills"]
+external_calls: []
 ---
 
 # Catalog Browse
