@@ -19,6 +19,9 @@ import { processMediaMessage } from '../telegram/media.js';
 export class AgentManager {
   private agents: Map<string, { process: AgentProcess; checker: FastChecker; poller?: TelegramPoller }> = new Map();
   private workers: Map<string, WorkerProcess> = new Map();
+  // Tracks agents that received a start request while still stopping.
+  // stopAgent() honors these after cleanup completes so restart-all is race-free.
+  private pendingRestarts: Set<string> = new Set();
   private instanceId: string;
   private ctxRoot: string;
   private frameworkRoot: string;
@@ -50,7 +53,10 @@ export class AgentManager {
    */
   async startAgent(name: string, agentDir: string, config?: AgentConfig): Promise<void> {
     if (this.agents.has(name)) {
-      console.log(`[agent-manager] Agent ${name} already running`);
+      // Agent is registered but may be mid-stop (race: restart-all sends stop+start simultaneously).
+      // Queue the start so stopAgent() will re-launch it once cleanup finishes.
+      this.pendingRestarts.add(name);
+      console.log(`[agent-manager] Agent ${name} is stopping — queued restart`);
       return;
     }
 
@@ -306,6 +312,15 @@ export class AgentManager {
     entry.checker.stop();
     await entry.process.stop();
     this.agents.delete(name);
+
+    // Honor any restart that was queued while we were stopping.
+    if (this.pendingRestarts.has(name)) {
+      this.pendingRestarts.delete(name);
+      console.log(`[agent-manager] Honoring queued restart for ${name}`);
+      this.startAgent(name, '').catch(err =>
+        console.error(`[agent-manager] Queued restart failed for ${name}:`, err),
+      );
+    }
   }
 
   /**
