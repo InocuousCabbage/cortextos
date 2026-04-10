@@ -463,6 +463,101 @@ export class AgentProcess {
       this.onStatusChange(this.getStatus());
     }
   }
+
+  /**
+   * Schedule a background cron verification check.
+   *
+   * Waits for the agent to finish its startup sequence (detected via the
+   * last_idle.flag written by the Stop hook after the agent's first turn
+   * completes), then injects a lightweight prompt asking the agent to
+   * verify its crons match config.json and restore any that are missing.
+   *
+   * Safe for both fresh starts and --continue restarts: the idle-wait
+   * ensures we never inject mid-conversation.
+   *
+   * Fire-and-forget: errors are logged but never propagated.
+   */
+  scheduleCronVerification(): void {
+    const crons = this.config.crons;
+    if (!crons || crons.length === 0) return;
+
+    const recurringNames = crons
+      .filter(c => c.type !== 'once')
+      .map(c => c.name);
+    if (recurringNames.length === 0) return;
+
+    const generation = this.lifecycleGeneration;
+
+    // Run in background — don't block startup
+    this.verifyCronsAfterIdle(recurringNames, generation).catch(err => {
+      this.log(`Cron verification failed (non-fatal): ${err}`);
+    });
+  }
+
+  private async verifyCronsAfterIdle(
+    expectedCrons: string[],
+    generation: number,
+  ): Promise<void> {
+    const stateDir = join(this.env.ctxRoot, 'state', this.name);
+    const flagPath = join(stateDir, 'last_idle.flag');
+
+    // Record the idle flag timestamp at boot so we can detect the NEXT idle
+    // (i.e. after the agent has finished processing its startup prompt).
+    let bootIdleTs = 0;
+    try {
+      if (existsSync(flagPath)) {
+        bootIdleTs = parseInt(readFileSync(flagPath, 'utf-8').trim(), 10);
+      }
+    } catch { /* ignore */ }
+
+    // Wait up to 10 minutes for the agent to finish its startup turn.
+    // Poll every 15s. Bail if the agent stopped or a new lifecycle started.
+    const maxWaitMs = 10 * 60 * 1000;
+    const pollMs = 15_000;
+    const startTime = Date.now();
+    let foundIdle = false;
+
+    while (Date.now() - startTime < maxWaitMs) {
+      // Bail if this lifecycle is stale (agent restarted or stopped)
+      if (generation !== this.lifecycleGeneration || this.status !== 'running') {
+        return;
+      }
+
+      await sleep(pollMs);
+
+      try {
+        if (existsSync(flagPath)) {
+          const currentIdleTs = parseInt(readFileSync(flagPath, 'utf-8').trim(), 10);
+          if (currentIdleTs > bootIdleTs) {
+            // Agent has gone idle after boot — safe to inject
+            foundIdle = true;
+            break;
+          }
+        }
+      } catch { /* ignore read errors, keep polling */ }
+    }
+
+    // If the loop timed out without detecting an idle transition, do not inject:
+    // the agent never finished its startup turn (e.g. stuck on a very long boot).
+    if (!foundIdle) {
+      this.log('Cron verification: timed out waiting for idle flag, skipping injection');
+      return;
+    }
+
+    // Final stale check
+    if (generation !== this.lifecycleGeneration || this.status !== 'running') {
+      return;
+    }
+
+    // Inject the verification prompt
+    const cronList = expectedCrons.join(', ');
+    const verifyPrompt = `[SYSTEM] Cron verification: your config.json defines these recurring crons: ${cronList}. Run CronList now. If any are missing, restore them from config.json using /loop. This is an automated safety check.`;
+
+    this.log(`Injecting cron verification (expecting: ${cronList})`);
+    if (this.pty) {
+      injectMessage((data) => this.pty!.write(data), verifyPrompt);
+    }
+  }
 }
 
 function sleep(ms: number): Promise<void> {

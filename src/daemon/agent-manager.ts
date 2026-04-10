@@ -266,6 +266,11 @@ export class AgentManager {
     // Start agent
     await agentProcess.start();
 
+    // Schedule background cron verification: waits for the agent to finish
+    // its startup turn (idle flag), then injects a prompt to verify CronList
+    // matches config.json. Handles both fresh and --continue restarts safely.
+    agentProcess.scheduleCronVerification();
+
     // Start fast checker in background
     checker.start().catch(err => {
       console.error(`[${name}] Fast checker error:`, err);
