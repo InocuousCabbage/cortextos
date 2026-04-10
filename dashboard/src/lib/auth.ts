@@ -114,17 +114,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 });
 
-/** Seed admin user from env vars if no users exist in the database */
+/** Seed admin user from env vars, or sync password if SYNC_ADMIN_PASSWORD=true */
 export async function seedAdminUser(): Promise<void> {
   const row = db
     .prepare('SELECT COUNT(*) as count FROM users')
     .get() as { count: number };
 
-  if (row.count > 0) return;
+  // Early return: users already exist and no password sync requested.
+  // Do NOT validate ADMIN_PASSWORD here — existing deployments may not have it set,
+  // and we don't need it when there is nothing to seed or sync.
+  if (row.count > 0 && process.env.SYNC_ADMIN_PASSWORD !== 'true') {
+    return;
+  }
 
   const username = process.env.ADMIN_USERNAME ?? 'admin';
 
   // Security (H8): Do not fall back to hardcoded password.
+  // Only validate when we actually need the password (seeding or syncing).
   const password = process.env.ADMIN_PASSWORD;
   if (!password) {
     throw new Error('ADMIN_PASSWORD environment variable is required but not set.');
@@ -132,6 +138,24 @@ export async function seedAdminUser(): Promise<void> {
   const KNOWN_DEFAULTS = ['cortextos', 'password', 'admin', 'changeme'];
   if (process.env.NODE_ENV === 'production' && KNOWN_DEFAULTS.includes(password)) {
     throw new Error('ADMIN_PASSWORD is a known default. Set a strong password in .env.local');
+  }
+
+  if (row.count > 0) {
+    // Opt-in password sync: only update stored hash when SYNC_ADMIN_PASSWORD=true.
+    // This prevents the dashboard from silently overwriting a password that was
+    // changed through the UI on every restart.
+    const user = db
+      .prepare('SELECT password_hash FROM users WHERE username = ?')
+      .get(username) as { password_hash: string } | undefined;
+    if (user) {
+      const matches = await bcrypt.compare(password, user.password_hash);
+      if (!matches) {
+        const hash = await bcrypt.hash(password, 12);
+        db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(hash, username);
+        console.log(`[auth] Admin password updated from environment (SYNC_ADMIN_PASSWORD=true)`);
+      }
+    }
+    return;
   }
 
   const hash = await bcrypt.hash(password, 12);
