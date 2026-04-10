@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { fetchOrgMetadata } from '@/lib/actions/settings';
+import { renderMarkdown } from '@/lib/render-markdown';
 
 interface OrgData {
   context: {
@@ -222,10 +223,8 @@ export function OrganizationTab() {
           <CardHeader>
             <CardTitle>Brand Voice</CardTitle>
           </CardHeader>
-          <CardContent>
-            <pre className="text-sm whitespace-pre-wrap font-sans text-muted-foreground">
-              {data.brandVoice}
-            </pre>
+          <CardContent className="text-muted-foreground">
+            {renderMarkdown(data.brandVoice)}
           </CardContent>
         </Card>
       )}

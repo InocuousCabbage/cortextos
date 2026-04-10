@@ -28,7 +28,7 @@ export function SparkLine({
   const chartData = data.map((value, i) => ({ i, v: value }));
 
   return (
-    <span className={className} style={{ display: 'inline-block', width, height }}>
+    <div className={className} style={{ display: 'inline-block', width, height, minWidth: 1, minHeight: 1 }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData}>
           <Line
@@ -41,6 +41,6 @@ export function SparkLine({
           />
         </LineChart>
       </ResponsiveContainer>
-    </span>
+    </div>
   );
 }
