@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, existsSync, writeFileSync, unlinkSync } from 'fs';
+import { exec } from 'child_process';
 import { join } from 'path';
 import { createHash } from 'crypto';
 import type { InboxMessage, BusPaths, TelegramMessage, TelegramCallbackQuery } from '../types/index.js';
@@ -41,6 +42,9 @@ export class FastChecker {
 
   // SIGUSR1 wake: resolve to immediately wake from sleep
   private wakeResolve: (() => void) | null = null;
+
+  // Idle-session heartbeat watchdog
+  private heartbeatTimer: NodeJS.Timeout | null = null;
 
   constructor(
     agent: AgentProcess,
@@ -85,6 +89,16 @@ export class FastChecker {
     await this.waitForBootstrap();
     this.log('Bootstrap complete. Beginning poll loop.');
 
+    // Idle-session heartbeat watchdog: fires every 50 min regardless of REPL state
+    const HEARTBEAT_INTERVAL_MS = 50 * 60 * 1000;
+    const agentName = this.agent.name;
+    this.heartbeatTimer = setInterval(() => {
+      const ts = new Date().toISOString();
+      exec(`cortextos bus update-heartbeat "[watchdog] ${agentName} alive — idle session ${ts}"`, (err) => {
+        if (err) this.log(`Heartbeat watchdog error: ${err.message}`);
+      });
+    }, HEARTBEAT_INTERVAL_MS);
+
     while (this.running) {
       try {
         // Check for urgent signal file
@@ -106,6 +120,10 @@ export class FastChecker {
    */
   stop(): void {
     this.running = false;
+    if (this.heartbeatTimer !== null) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
   }
 
   /**
