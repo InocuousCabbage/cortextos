@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-vi.mock('child_process', () => ({ exec: vi.fn() }));
+vi.mock('child_process', () => ({ execFile: vi.fn() }));
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -718,13 +718,14 @@ describe('FastChecker', () => {
     afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
     it('fires exec after bootstrap at 50-min interval', async () => {
-      const { exec } = await import('child_process');
+      const { execFile } = await import('child_process');
       const agent = createMockAgent('my-agent');
       const checker = new FastChecker(agent, paths, '/tmp/framework');
       checker.start();
       await vi.advanceTimersByTimeAsync(50 * 60 * 1000);
-      expect(exec).toHaveBeenCalledWith(
-        expect.stringContaining('[watchdog] my-agent alive — idle session'),
+      expect(execFile).toHaveBeenCalledWith(
+        'cortextos',
+        expect.arrayContaining(['bus', 'update-heartbeat', expect.stringContaining('[watchdog] my-agent alive — idle session')]),
         expect.any(Function),
       );
       checker.stop();
@@ -732,8 +733,8 @@ describe('FastChecker', () => {
     });
 
     it('clears timer on stop — no further exec calls after stop', async () => {
-      const { exec } = await import('child_process');
-      const execMock = exec as ReturnType<typeof vi.fn>;
+      const { execFile } = await import('child_process');
+      const execMock = execFile as ReturnType<typeof vi.fn>;
       const agent = createMockAgent('my-agent');
       const checker = new FastChecker(agent, paths, '/tmp/framework');
       checker.start();
@@ -747,14 +748,15 @@ describe('FastChecker', () => {
     });
 
     it('does not fire before bootstrap completes', async () => {
-      const { exec } = await import('child_process');
+      const { execFile } = await import('child_process');
       const agent = createMockAgent('my-agent');
       agent.isBootstrapped.mockReturnValue(false);
       const checker = new FastChecker(agent, paths, '/tmp/framework');
       checker.start();
       await vi.advanceTimersByTimeAsync(20 * 1000);
-      expect(exec).not.toHaveBeenCalledWith(
-        expect.stringContaining('[watchdog]'),
+      expect(execFile).not.toHaveBeenCalledWith(
+        'cortextos',
+        expect.arrayContaining([expect.stringContaining('[watchdog]')]),
         expect.any(Function),
       );
       checker.stop();
