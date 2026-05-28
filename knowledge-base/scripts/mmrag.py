@@ -1155,9 +1155,11 @@ def ingest_file(client, config, collection, file_path):
     if parts & skip_dirs:
         return 0
 
-    # Skip text files > 10MB (likely generated/binary)
+    # Skip text files > 10MB (likely generated/binary). .csv is exempt: it routes to
+    # ingest_csv, which only reads headers + a bounded sample + a row count, so file
+    # size is irrelevant to its cost (a 30MB CSV summarizes as cheaply as a 30KB one).
     size_mb = file_path.stat().st_size / (1024 * 1024)
-    if ext in TEXT_EXTS and size_mb > 10:
+    if ext in TEXT_EXTS and ext != ".csv" and size_mb > 10:
         print(f"  SKIP (too large: {size_mb:.0f}MB): {file_path}")
         return 0
     if ext in IMAGE_EXTS and size_mb > 50:

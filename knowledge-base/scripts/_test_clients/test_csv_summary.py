@@ -269,6 +269,35 @@ def test_ingest_csv_empty_returns_zero():
         p.unlink()
 
 
+def test_ingest_file_routes_large_csv_to_ingest_csv():
+    # A CSV over the 10MB text-size guard must still be summarized, not skipped:
+    # ingest_csv only reads headers + a bounded sample + a row count, so file size
+    # is irrelevant to its cost. (The generic TEXT_EXTS >10MB skip must not apply to .csv.)
+    big = tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, newline="")
+    big.write("a,b,c\n")
+    row = "x,y,z\n"
+    target = 11 * 1024 * 1024  # >10MB
+    written = 6
+    while written < target:
+        big.write(row)
+        written += len(row)
+    big.close()
+    p = Path(big.name)
+    routed = {"csv": 0, "text": 0}
+    orig_csv = mmrag.ingest_csv
+    orig_text = mmrag.ingest_text_file
+    mmrag.ingest_csv = lambda c, cfg, col, fp: routed.__setitem__("csv", routed["csv"] + 1) or 1
+    mmrag.ingest_text_file = lambda c, cfg, col, fp: routed.__setitem__("text", routed["text"] + 1) or 1
+    try:
+        result = mmrag.ingest_file(None, {}, _StubCollection(), p)
+        _check("large .csv NOT skipped (routes to ingest_csv)", routed["csv"] == 1, f"csv={routed['csv']}, result={result}")
+        _check("large .csv not sent to text path", routed["text"] == 0, f"text={routed['text']}")
+    finally:
+        mmrag.ingest_csv = orig_csv
+        mmrag.ingest_text_file = orig_text
+        p.unlink()
+
+
 def test_ingest_file_routes_csv_to_ingest_csv():
     # Route .csv through ingest_csv, NOT ingest_text_file. Verify by monkeypatching.
     p = _write_csv("a,b\n1,2\n")
