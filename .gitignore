@@ -67,3 +67,6 @@ WINDOWS_INSTALL_REPORT.md
 *INSTALL_REPORT.md
 /PHASE*-REPORT.md
 docs/phase-reports/
+
+# local code-review scratch (local-ultrareview session output)
+reviews/
