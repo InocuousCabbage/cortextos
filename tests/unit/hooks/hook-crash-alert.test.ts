@@ -159,6 +159,68 @@ describe('notifyAgents', () => {
   });
 });
 
+describe('notifyAgents — framework-root execFile shape', () => {
+  // Sibling block to the fallback-shape tests above. Closes the same coverage
+  // gap as the framework-root block in tests/unit/bus/hooks.test.ts: the
+  // PATH-aware (CTX_FRAMEWORK_ROOT-set) branch is the production path on a
+  // daemon-managed runtime, and a regression there would only surface in
+  // production. See #556 (a89cee2) for the underlying refactor.
+  let savedFrameworkRoot: string | undefined;
+  let tmpFrameworkRoot: string;
+
+  beforeEach(() => {
+    execFileMock.mockReset();
+    savedFrameworkRoot = process.env.CTX_FRAMEWORK_ROOT;
+    tmpFrameworkRoot = mkdtempSync(join(tmpdir(), 'crashalert-framework-'));
+    process.env.CTX_FRAMEWORK_ROOT = tmpFrameworkRoot;
+  });
+
+  afterEach(() => {
+    if (savedFrameworkRoot !== undefined) {
+      process.env.CTX_FRAMEWORK_ROOT = savedFrameworkRoot;
+    } else {
+      delete process.env.CTX_FRAMEWORK_ROOT;
+    }
+    rmSync(tmpFrameworkRoot, { recursive: true, force: true });
+  });
+
+  it('invokes process.execPath + cliPath shape (not the PATH fallback)', () => {
+    notifyAgents({
+      agentName: 'dev',
+      endType: 'crash',
+      reason: 'r',
+      lastTask: 't',
+      crashCount: 1,
+      restartAttempted: true,
+      recipients: ['chief'],
+    });
+
+    expect(execFileMock).toHaveBeenCalledTimes(1);
+    const [cmd, args] = execFileMock.mock.calls[0];
+    expect(cmd).toBe(process.execPath);
+    expect(args[0]).toBe(join(tmpFrameworkRoot, 'dist', 'cli.js'));
+    expect(args.slice(1, 5)).toEqual(['bus', 'send-message', 'chief', 'high']);
+  });
+
+  it('falls through to PATH-lookup shape when CTX_FRAMEWORK_ROOT is empty string', () => {
+    process.env.CTX_FRAMEWORK_ROOT = '';
+
+    notifyAgents({
+      agentName: 'dev',
+      endType: 'crash',
+      reason: 'r',
+      lastTask: 't',
+      crashCount: 1,
+      restartAttempted: true,
+      recipients: ['chief'],
+    });
+
+    const [cmd, args] = execFileMock.mock.calls[0];
+    expect(cmd).toBe('cortextos');
+    expect(args[0]).toBe('bus');
+  });
+});
+
 describe('classifyFromMarkers', () => {
   let tmp: string;
   const MARKERS = [

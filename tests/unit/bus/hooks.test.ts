@@ -297,3 +297,84 @@ describe('src/bus/hooks — Day-2 per-handler wiring', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// emitHookBusEvent — framework-root execFile shape coverage
+//
+// Closes the coverage gap from #556 (a89cee2). The outer describe in this
+// file deliberately clears CTX_FRAMEWORK_ROOT to assert the fallback shape
+// (`execFile('cortextos', ['bus', ...])`). This block asserts the
+// framework-root shape (`execFile(process.execPath, [cliPath, 'bus', ...])`)
+// — the production path on a daemon-managed runtime where CTX_FRAMEWORK_ROOT
+// is set at startup. Without this coverage, a regression that broke the
+// framework-root branch would surface only in production.
+// ---------------------------------------------------------------------------
+describe('src/bus/hooks — emitHookBusEvent framework-root shape', () => {
+  let savedFrameworkRoot: string | undefined;
+  let tmpFrameworkRoot: string;
+
+  beforeEach(() => {
+    execFileCalls.length = 0;
+    clearHandlerRegistry();
+    savedFrameworkRoot = process.env.CTX_FRAMEWORK_ROOT;
+    tmpFrameworkRoot = mkdtempSync(join(tmpdir(), 'cx-framework-root-'));
+    process.env.CTX_FRAMEWORK_ROOT = tmpFrameworkRoot;
+  });
+
+  afterEach(() => {
+    if (savedFrameworkRoot !== undefined) {
+      process.env.CTX_FRAMEWORK_ROOT = savedFrameworkRoot;
+    } else {
+      delete process.env.CTX_FRAMEWORK_ROOT;
+    }
+    rmSync(tmpFrameworkRoot, { recursive: true, force: true });
+  });
+
+  it('invokes process.execPath + cliPath shape (not the PATH fallback)', async () => {
+    await dispatchHook(makeHook(), makeEvent());
+
+    expect(execFileCalls.length).toBeGreaterThan(0);
+    const call = execFileCalls[execFileCalls.length - 1];
+
+    // cmd is the Node binary, not 'cortextos' — proves we took the
+    // framework-root branch, not the PATH-lookup fallback.
+    expect(call.cmd).toBe(process.execPath);
+
+    // args[0] is the path to dist/cli.js under the framework root.
+    expect(call.args[0]).toBe(join(tmpFrameworkRoot, 'dist', 'cli.js'));
+
+    // args[1..] is the same bus command tail as the fallback shape.
+    expect(call.args.slice(1, 4)).toEqual(['bus', 'log-event', 'action']);
+    expect(call.args[4]).toBe('hook_fire');
+    expect(call.args.slice(5, 7)).toEqual(['info', '--meta']);
+
+    // The meta JSON should still parse cleanly — same payload across both shapes.
+    const meta = JSON.parse(call.args[7]);
+    expect(meta).toHaveProperty('hook_id');
+  });
+
+  it('uses CTX_FRAMEWORK_ROOT verbatim when constructing cliPath (no normalization surprises)', async () => {
+    // If the path has a trailing slash, `join` collapses it — but the resolved
+    // cliPath should still equal join(root, 'dist', 'cli.js'). This guards
+    // against a future refactor that swaps `join` for string concatenation.
+    process.env.CTX_FRAMEWORK_ROOT = tmpFrameworkRoot + '/';
+
+    await dispatchHook(makeHook(), makeEvent());
+
+    const call = execFileCalls[execFileCalls.length - 1];
+    expect(call.args[0]).toBe(join(tmpFrameworkRoot, 'dist', 'cli.js'));
+  });
+
+  it('falls through to PATH-lookup shape only when CTX_FRAMEWORK_ROOT is empty string (not just unset)', async () => {
+    // Edge case worth pinning: the production check is `if (frameworkRoot)`
+    // which treats empty string as falsy. Confirm an empty-string env doesn't
+    // construct a `/dist/cli.js` path that would silently fail at exec time.
+    process.env.CTX_FRAMEWORK_ROOT = '';
+
+    await dispatchHook(makeHook(), makeEvent());
+
+    const call = execFileCalls[execFileCalls.length - 1];
+    expect(call.cmd).toBe('cortextos');
+    expect(call.args[0]).toBe('bus');
+  });
+});
