@@ -274,40 +274,57 @@ export class TelegramAPI {
 
     await this.rateLimit(String(chatId));
 
+    // Read the file ONCE outside the retry loop. FormData with a Blob/Stream
+    // body is single-use — once consumed by fetch, the stream is exhausted —
+    // so the FormData itself must be rebuilt per attempt. The file bytes
+    // themselves are stable in memory and safe to reuse across attempts.
     const fileData = readFileSync(imagePath);
     const fileName = basename(imagePath);
 
-    // Build multipart form data using built-in FormData + Blob
-    const formData = new FormData();
-    formData.append('chat_id', String(chatId));
-    formData.append('photo', new Blob([fileData]), fileName);
-    if (caption) {
-      formData.append('caption', caption);
-    }
-    if (replyMarkup) {
-      formData.append('reply_markup', JSON.stringify(replyMarkup));
-    }
+    const buildFormData = (): FormData => {
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      formData.append('photo', new Blob([fileData]), fileName);
+      if (caption) {
+        formData.append('caption', caption);
+      }
+      if (replyMarkup) {
+        formData.append('reply_markup', JSON.stringify(replyMarkup));
+      }
+      return formData;
+    };
 
-    try {
-      const response = await fetch(`${this.baseUrl}/sendPhoto`, {
-        method: 'POST',
-        body: formData,
-        signal: AbortSignal.timeout(60000),
-      });
-      const result = await response.json() as any;
-      if (!result.ok) {
-        throw new Error(`Telegram API error: ${result.description || 'Unknown error'}`);
+    // Single retry on transport-level errors mirrors post() at line ~614.
+    // Same safety property: transport-error fires BEFORE any request body is
+    // written (undici keepalive socket reuse against a server-dropped idle
+    // connection), so the upload is provably not delivered and re-sending the
+    // file is not a double-send hazard.
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch(`${this.baseUrl}/sendPhoto`, {
+          method: 'POST',
+          body: buildFormData(),
+          signal: AbortSignal.timeout(60000),
+        });
+        const result = await response.json() as any;
+        if (!result.ok) {
+          throw new Error(`Telegram API error: ${result.description || 'Unknown error'}`);
+        }
+        return result;
+      } catch (err) {
+        if (err instanceof Error && err.message.startsWith('Telegram API error')) {
+          throw err;
+        }
+        if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+          throw new Error(`Telegram API request timed out after 60s: sendPhoto`);
+        }
+        lastErr = err;
+        if (attempt === 0) continue;
+        break;
       }
-      return result;
-    } catch (err) {
-      if (err instanceof Error && err.message.startsWith('Telegram API error')) {
-        throw err;
-      }
-      if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
-        throw new Error(`Telegram API request timed out after 60s: sendPhoto`);
-      }
-      throw new Error(`Telegram API request failed: ${err}`);
     }
+    throw new Error(`Telegram API request failed: ${lastErr}`);
   }
 
   /**
@@ -326,39 +343,50 @@ export class TelegramAPI {
 
     await this.rateLimit(String(chatId));
 
+    // See sendPhoto for the per-attempt FormData rebuild rationale (FormData
+    // with a Blob body is single-use, must be rebuilt per attempt).
     const fileData = readFileSync(filePath);
     const fileName = basename(filePath);
 
-    const formData = new FormData();
-    formData.append('chat_id', String(chatId));
-    formData.append('document', new Blob([fileData]), fileName);
-    if (caption) {
-      formData.append('caption', caption);
-    }
-    if (replyMarkup) {
-      formData.append('reply_markup', JSON.stringify(replyMarkup));
-    }
+    const buildFormData = (): FormData => {
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      formData.append('document', new Blob([fileData]), fileName);
+      if (caption) {
+        formData.append('caption', caption);
+      }
+      if (replyMarkup) {
+        formData.append('reply_markup', JSON.stringify(replyMarkup));
+      }
+      return formData;
+    };
 
-    try {
-      const response = await fetch(`${this.baseUrl}/sendDocument`, {
-        method: 'POST',
-        body: formData,
-        signal: AbortSignal.timeout(60000),
-      });
-      const result = await response.json() as any;
-      if (!result.ok) {
-        throw new Error(`Telegram API error: ${result.description || 'Unknown error'}`);
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch(`${this.baseUrl}/sendDocument`, {
+          method: 'POST',
+          body: buildFormData(),
+          signal: AbortSignal.timeout(60000),
+        });
+        const result = await response.json() as any;
+        if (!result.ok) {
+          throw new Error(`Telegram API error: ${result.description || 'Unknown error'}`);
+        }
+        return result;
+      } catch (err) {
+        if (err instanceof Error && err.message.startsWith('Telegram API error')) {
+          throw err;
+        }
+        if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+          throw new Error(`Telegram API request timed out after 60s: sendDocument`);
+        }
+        lastErr = err;
+        if (attempt === 0) continue;
+        break;
       }
-      return result;
-    } catch (err) {
-      if (err instanceof Error && err.message.startsWith('Telegram API error')) {
-        throw err;
-      }
-      if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
-        throw new Error(`Telegram API request timed out after 60s: sendDocument`);
-      }
-      throw new Error(`Telegram API request failed: ${err}`);
     }
+    throw new Error(`Telegram API request failed: ${lastErr}`);
   }
 
   /**

@@ -327,3 +327,143 @@ describe('formatValidateError', () => {
     expect(msg).toMatch(/retry/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// sendPhoto + sendDocument single-retry on transport errors
+//
+// Mirrors the post() retry behavior at TelegramAPI.post (~line 614). FormData
+// with a Blob body is single-use — the test exercises the per-attempt rebuild
+// path by failing the first fetch with a transport-class error and confirming
+// the second attempt succeeds with a freshly-built FormData payload.
+// ---------------------------------------------------------------------------
+describe('TelegramAPI.sendPhoto / sendDocument single-retry', () => {
+  const originalFetch = globalThis.fetch;
+  const tmpDir = require('os').tmpdir();
+  const path = require('path');
+  const fs = require('fs');
+  let tmpFile: string;
+
+  beforeEach(() => {
+    tmpFile = path.join(tmpDir, `telegram-retry-test-${Date.now()}-${Math.random().toString(36).slice(2)}.bin`);
+    fs.writeFileSync(tmpFile, Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
+  });
+
+  afterEach(() => {
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('sendPhoto: retries once on transport error and succeeds', async () => {
+    let callCount = 0;
+    globalThis.fetch = vi.fn(async () => {
+      callCount++;
+      if (callCount === 1) {
+        // Simulate undici keepalive socket reuse error class (transport-level,
+        // body not yet written — same safety property as post() retry).
+        const err = new TypeError('fetch failed');
+        throw err;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, result: { message_id: 42 } }),
+      } as any;
+    }) as any;
+
+    const api = new TelegramAPI('123:TEST');
+    const result = await api.sendPhoto('chat-1', tmpFile, 'caption');
+
+    expect(callCount).toBe(2);
+    expect(result.ok).toBe(true);
+    expect(result.result.message_id).toBe(42);
+  });
+
+  it('sendPhoto: does NOT retry on Telegram API error (4xx-class semantics)', async () => {
+    let callCount = 0;
+    globalThis.fetch = vi.fn(async () => {
+      callCount++;
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({ ok: false, description: 'Bad Request: photo dimensions invalid' }),
+      } as any;
+    }) as any;
+
+    const api = new TelegramAPI('123:TEST');
+    await expect(api.sendPhoto('chat-1', tmpFile)).rejects.toThrow(/Telegram API error/);
+    expect(callCount).toBe(1);
+  });
+
+  it('sendPhoto: does NOT retry on timeout (write-may-have-completed semantics)', async () => {
+    let callCount = 0;
+    globalThis.fetch = vi.fn(async () => {
+      callCount++;
+      const err = new Error('aborted');
+      err.name = 'TimeoutError';
+      throw err;
+    }) as any;
+
+    const api = new TelegramAPI('123:TEST');
+    await expect(api.sendPhoto('chat-1', tmpFile)).rejects.toThrow(/timed out after 60s/);
+    expect(callCount).toBe(1);
+  });
+
+  it('sendDocument: retries once on transport error and succeeds', async () => {
+    let callCount = 0;
+    globalThis.fetch = vi.fn(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new TypeError('fetch failed');
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, result: { message_id: 99 } }),
+      } as any;
+    }) as any;
+
+    const api = new TelegramAPI('123:TEST');
+    const result = await api.sendDocument('chat-1', tmpFile, 'doc caption');
+
+    expect(callCount).toBe(2);
+    expect(result.ok).toBe(true);
+    expect(result.result.message_id).toBe(99);
+  });
+
+  it('sendDocument: passes a fresh FormData on retry (not the consumed one)', async () => {
+    const bodiesSeen: any[] = [];
+    let callCount = 0;
+    globalThis.fetch = vi.fn(async (_url: any, init: any) => {
+      callCount++;
+      bodiesSeen.push(init?.body);
+      if (callCount === 1) throw new TypeError('fetch failed');
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, result: {} }),
+      } as any;
+    }) as any;
+
+    const api = new TelegramAPI('123:TEST');
+    await api.sendDocument('chat-1', tmpFile);
+
+    expect(bodiesSeen.length).toBe(2);
+    // Each attempt gets a distinct FormData instance — re-using the consumed
+    // stream would silently fail (or hang) on undici. Identity check is the
+    // load-bearing assertion here.
+    expect(bodiesSeen[0]).not.toBe(bodiesSeen[1]);
+  });
+
+  it('sendPhoto: throws when retry also fails (no infinite loop)', async () => {
+    let callCount = 0;
+    globalThis.fetch = vi.fn(async () => {
+      callCount++;
+      throw new TypeError('fetch failed');
+    }) as any;
+
+    const api = new TelegramAPI('123:TEST');
+    await expect(api.sendPhoto('chat-1', tmpFile)).rejects.toThrow(/request failed/);
+    expect(callCount).toBe(2);
+  });
+});
