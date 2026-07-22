@@ -90,6 +90,8 @@ cortextos bus complete-task "$TASK_ID" --result "<what was produced>"
 
 ## Phase 0E: Services Health Check
 
+**ALWAYS run Phase 0E, even when the operational briefing has already been delivered via another channel** (e.g. the analyst's daily digest fold-in). The service probes catch silent auth expirations independent of briefing delivery — bundling them with the skippable briefing-content phases (0A-0D, 1, 2, 3) loses the OAuth-expiry early warning. When skipping the briefing phases, log `briefing_skipped` with reason `cascaded_via_digest` and continue to Phase 0E.
+
 Probe each configured external service BEFORE the briefing. Auth failures discovered here get into the briefing as actionable items — not discovered hours later when the user needs the service.
 
 **For each service, run the probe. If it fails, create a [HUMAN] task immediately.**
